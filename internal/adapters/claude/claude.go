@@ -154,10 +154,18 @@ type jsonManifest struct {
 		Name string `json:"name,omitempty"`
 		URL  string `json:"url,omitempty"`
 	} `json:"author,omitempty"`
+	License    string   `json:"license,omitempty"`
+	Homepage   string   `json:"homepage,omitempty"`
+	Repository string   `json:"repository,omitempty"`
+	Keywords   []string `json:"keywords,omitempty"`
 }
 
 func compileManifest(p *model.Plugin) ([]byte, error) {
-	m := jsonManifest{Name: p.Name, Version: p.Version, Description: p.Description}
+	m := jsonManifest{
+		Name: p.Name, Version: p.Version, Description: p.Description,
+		License: p.License, Homepage: p.Homepage, Repository: p.Repository,
+		Keywords: p.Keywords,
+	}
 	if p.Author.Name != "" || p.Author.URL != "" {
 		m.Author = &struct {
 			Name string `json:"name,omitempty"`

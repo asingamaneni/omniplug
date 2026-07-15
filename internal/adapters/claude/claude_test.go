@@ -13,7 +13,9 @@ func boolPtr(b bool) *bool { return &b }
 func samplePlugin() *model.Plugin {
 	return &model.Plugin{
 		Name: "demo", Version: "1.2.3", Description: "demo plugin",
-		Author: model.Author{Name: "Ashok"},
+		Author:  model.Author{Name: "Ashok"},
+		License: "MIT", Homepage: "https://example.com",
+		Repository: "https://github.com/x/demo", Keywords: []string{"ai", "demo"},
 		Skills: []model.Skill{{
 			Name: "deploy", Description: "Deploy it", Model: model.TierBalanced,
 			AutoInvoke: boolPtr(false), AllowedTools: []string{"Bash(git push *)", "Read"},
@@ -57,6 +59,32 @@ func TestCompileProducesExpectedFiles(t *testing.T) {
 	for _, w := range want {
 		if _, ok := b.Files[w]; !ok {
 			t.Errorf("missing expected file %q", w)
+		}
+	}
+}
+
+func TestManifestMetadataEmitted(t *testing.T) {
+	b := compile(t)
+	manifest := string(b.Files[".claude-plugin/plugin.json"])
+	for _, want := range []string{`"license": "MIT"`, `"homepage": "https://example.com"`,
+		`"repository": "https://github.com/x/demo"`, `"keywords"`} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("plugin.json missing %s:\n%s", want, manifest)
+		}
+	}
+}
+
+func TestManifestMetadataOmittedWhenEmpty(t *testing.T) {
+	p := samplePlugin()
+	p.License, p.Homepage, p.Repository, p.Keywords = "", "", "", nil
+	b, _, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	manifest := string(b.Files[".claude-plugin/plugin.json"])
+	for _, absent := range []string{`"license"`, `"homepage"`, `"repository"`, `"keywords"`} {
+		if strings.Contains(manifest, absent) {
+			t.Errorf("plugin.json should omit empty %s:\n%s", absent, manifest)
 		}
 	}
 }
