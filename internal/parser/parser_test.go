@@ -43,8 +43,8 @@ func TestLoadComponents(t *testing.T) {
 	if len(p.Agents) != 1 {
 		t.Fatalf("agents = %d, want 1", len(p.Agents))
 	}
-	if len(p.Hooks) != 1 {
-		t.Fatalf("hooks = %d, want 1", len(p.Hooks))
+	if len(p.Hooks) != 2 {
+		t.Fatalf("hooks = %d, want 2", len(p.Hooks))
 	}
 	if len(p.MCPServers) != 2 {
 		t.Fatalf("mcp servers = %d, want 2", len(p.MCPServers))

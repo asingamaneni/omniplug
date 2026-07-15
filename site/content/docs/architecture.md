@@ -173,16 +173,16 @@ Canonical `SKILL.md` frontmatter and how each adapter projects it:
 | `name`                   | `name`                        | `name`                       | `name`                                  |
 | `description`            | `description`                 | `description`                | `description`                           |
 | `whenToUse`              | `when_to_use`                 | folded into `description`    | folded into `description`               |
-| `argumentHint`           | `argument-hint`               | —                            | —                                       |
-| `arguments`              | `arguments`                   | —                            | —                                       |
+| `argumentHint`           | `argument-hint`               | ⚠                            | —                                       |
+| `arguments`              | `arguments`                   | ⚠                            | —                                       |
 | `autoInvoke: false`      | `disable-model-invocation: true` | `disable-model-invocation: true` | `policy.allow_implicit_invocation: false` |
-| `userInvocable: false`   | `user-invocable: false`       | —                            | —                                       |
+| `userInvocable: false`   | `user-invocable: false`       | ⚠                            | —                                       |
 | `allowedTools`           | `allowed-tools`               | ⚠ (Cursor governs tools separately) | ⚠                                |
 | `disallowedTools`        | `disallowed-tools`            | ⚠                            | ⚠                                       |
 | `model` (tier)           | `model` (mapped)              | `model` (`fast`/`inherit` only; finer tiers ⚠) | ⚠                      |
-| `effort`                 | `effort`                      | —                            | —                                       |
-| `globs`                  | `paths`                       | `globs` (.mdc)               | —                                       |
-| `runInSubagent`          | `context: fork` (+ `agent`)   | —                            | —                                       |
+| `effort`                 | `effort`                      | ⚠                            | —                                       |
+| `globs`                  | `paths`                       | ⚠ (skill; rules use `globs`) | —                                       |
+| `runInSubagent`          | `context: fork` (+ `agent`)   | ⚠                            | —                                       |
 | `display` / `icon` / `brandColor` | —                    | —                            | `interface.*` in `openai.yaml`          |
 
 `—` = no equivalent (dropped silently); `⚠` = dropped with a warning. Only `name`/`description` are guaranteed lossless everywhere. Cursor's `SKILL.md` honors `name`, `description`, `model`, and `disable-model-invocation`.
@@ -211,15 +211,15 @@ Richest on Claude; Codex and Cursor (native `.cursor/agents/*.md`, since 1.7) su
 | `name`             | `name`                        | name                         | `name`                       |
 | `description`      | `description`                 | description                  | `description`                |
 | body               | system prompt (md body)       | prompt                       | system prompt (md body)      |
-| `tools`            | `tools`                       | tools                        | ⚠ (only name/description)    |
-| `disallowedTools`  | `disallowedTools`             | ⚠                            | ⚠                            |
-| `model` (tier)     | `model` (mapped)              | model (mapped)               | ⚠                            |
+| `tools`            | `tools`                       | tools                        | ⚠ (write-denying config → `readonly: true`) |
+| `disallowedTools`  | `disallowedTools`             | ⚠                            | ⚠ (`Write`+`Edit` denial → `readonly: true`) |
+| `model` (tier)     | `model` (mapped)              | model (mapped)               | `model` (`fast`/`inherit`; finer tiers ⚠) |
 | `maxTurns`         | `maxTurns`                    | ⚠                            | ⚠                            |
-| `color`            | `color`                       | —                            | —                            |
+| `color`            | `color`                       | —                            | ⚠                            |
 | `mcpServers`       | `mcpServers`                  | ⚠ (declare in plugin config) | ⚠                            |
 | `hooks` / `memory` | `hooks` / `memory`            | ⚠                            | ⚠ (`.cursor/hooks.json` is global, not per-agent) |
 
-Cursor subagent frontmatter recognizes **only** `name` and `description` (name must match the filename stem); the body is the system prompt. All other canonical agent fields degrade with a diagnostic.
+Cursor subagent frontmatter (1.7+) recognizes `name`, `description`, `model`, `readonly`, and `is_background` (name must match the filename stem); the body is the system prompt. The adapter maps a write-denying canonical tool config (a `Write`+`Edit` denial, or an allowlist granting no write/exec tool) to `readonly: true` — Cursor's flag is at least as restrictive, so degradation never widens access. Remaining fields degrade with a diagnostic; `is_background` is reachable via the `targets.cursor` escape hatch.
 
 > **Note on Claude plugin subagents:** when shipped inside a plugin, Claude ignores `hooks`, `mcpServers`, and `permissionMode` for security. The Claude adapter must therefore emit a `Validate()` warning if an agent relies on these and is bound for plugin distribution.
 
@@ -265,11 +265,12 @@ type Adapter interface {
     // Validate target-specific constraints (e.g. Cursor's ~40 tool ceiling).
     Validate(p *model.Plugin) []Diagnostic
 
-    // Pure transform: model -> files in memory (no disk writes).
-    Compile(p *model.Plugin) (Bundle, error)
+    // Pure transform: model -> files in memory (no disk writes), plus
+    // graceful-degradation diagnostics.
+    Compile(p *model.Plugin) (Bundle, []Diagnostic, error)
 
-    // Where each scope installs on disk for this target.
-    InstallLocations(scope Scope) (InstallPlan, error)
+    // Where the Bundle installs on disk for the given scope.
+    InstallPlan(p *model.Plugin, scope Scope, projectDir string) (InstallPlan, error)
 }
 
 type Capabilities struct {
@@ -282,7 +283,8 @@ type Capabilities struct {
 }
 
 type Bundle struct {
-    Files map[string][]byte // relative path -> contents (deterministic)
+    Files map[string][]byte      // relative path -> contents (deterministic)
+    Modes map[string]fs.FileMode // non-default modes (e.g. executable scripts)
 }
 ```
 
@@ -312,7 +314,7 @@ When a component (or field) has no native home on a target, the adapter declares
 |---|---|---|---|
 | `plugin.yaml` | `.claude-plugin/plugin.json` | derived (no manifest) | `agents/openai.yaml` |
 | `skills/` | `skills/` (verbatim) | `.cursor/skills/` (verbatim) | `.agents/skills/` (verbatim) |
-| `commands/` | `commands/*.md` | `.cursor/rules/*.mdc` (Manual `@`) | `~/.codex/prompts/*.md` (or skill) |
+| `commands/` | `commands/*.md` | `.cursor/rules/*.mdc` (Agent-Requested, `@`-mentionable) | `~/.codex/prompts/*.md` (or skill) |
 | `agents/` | `agents/*.md` | `.cursor/agents/*.md` (`readonly` flag) | subagents config |
 | `hooks/` | `hooks/hooks.json` (wrapped under `"hooks"`) | `.cursor/hooks.json` (`version` + camelCase events) | hooks config |
 | `mcp/servers.yaml` | `.mcp.json` (stdio+remote `type`; env `${VAR}`) | `.cursor/mcp.json` (stdio `type`; env `${env:VAR}`) | mcp block in `openai.yaml`/config |
@@ -320,7 +322,21 @@ When a component (or field) has no native home on a target, the adapter declares
 
 Skills and MCP are the highest-fidelity, fully portable rows. Claude and Cursor both support every component natively; per-field gaps (e.g. an agent's explicit tool allowlist on Cursor, or a fine model tier) degrade with a diagnostic.
 
-> **Validated** against official docs (June 2026), confirmed twice: plugin `hooks.json` wraps events under a top-level `"hooks"` key, and bundled hook scripts must be referenced via `${CLAUDE_PLUGIN_ROOT}/…` on Claude (the working directory is not the plugin root) — so the adapter rewrites `./…` commands and bundles the scripts. Claude `.mcp.json` remote servers use `type: http` + `url`; Cursor infers remote transport from `url` alone but **requires `type: "stdio"`** on local servers, and bundled MCP commands use `${workspaceFolder}`. Cursor 1.7+ has native `.cursor/hooks.json` (camelCase `preToolUse`/`postToolUse`) and `.cursor/agents/*.md` subagents whose frontmatter recognizes **only** `name` + `description`; richer agent fields degrade with a diagnostic.
+> **Validated** against official docs (July 2026): plugin `hooks.json` wraps events under a top-level `"hooks"` key, and bundled hook scripts must be referenced via `${CLAUDE_PLUGIN_ROOT}/…` on Claude (the working directory is not the plugin root) — so the adapter rewrites `./…` commands and bundles the scripts. Claude `.mcp.json` remote servers use `type: http` + `url`; Cursor infers remote transport from `url` alone but **requires `type: "stdio"`** on local servers, and bundled MCP commands use `${workspaceFolder}`. Cursor 1.7+ has native `.cursor/hooks.json` (version 1, camelCase events) and `.cursor/agents/*.md` subagents (frontmatter: `name`, `description`, `model`, `readonly`, `is_background`).
+>
+> **Hook matchers diverge**: Claude matches its own tool names (`Bash`, `Edit|Write`), while Cursor matches tool *types* (`Shell`, `Write`, `Read`, …). The Cursor adapter translates matcher tokens (`Bash`→`Shell`; `Edit`/`Write`/`MultiEdit`/`NotebookEdit`→`Write`); untranslatable tokens (MCP tools, `Bash(...)` patterns, subagent names) are omitted with a diagnostic and the hook ships unfiltered — filter inside the script via the stdin JSON.
+
+#### Hook event mapping (canonical → Cursor)
+
+| Canonical (Claude-style) | Cursor `hooks.json` v1 | matcher |
+|---|---|---|
+| `PreToolUse` / `PostToolUse` | `preToolUse` / `postToolUse` | translated to tool types |
+| `SubagentStart` / `SubagentStop` | `subagentStart` / `subagentStop` | ⚠ dropped (Cursor matches subagent *types*, not names) |
+| `Stop` | `stop` | — |
+| `SessionStart` / `SessionEnd` | `sessionStart` / `sessionEnd` | — |
+| `PreCompact` | `preCompact` | — |
+| `UserPromptSubmit` | `beforeSubmitPrompt` | — |
+| `Notification` | ⚠ dropped (no equivalent) | — |
 >
 > **Env-var interpolation diverges** and is a true portability hazard: Claude expands `${VAR}` (and `${VAR:-default}`) from the environment, but Cursor needs the `env:` prefix — `${env:VAR}` — and reserves bare `${workspaceFolder}`/`${userHome}` for its own builtins. The canonical source is authored in the `${VAR}` form; the Cursor adapter rewrites env references to `${env:VAR}` while leaving Cursor builtins untouched.
 
@@ -364,7 +380,7 @@ omniplug doctor                      # detect installed tools, versions, paths
 ```
 
 - `validate` and `--dry-run` make CI and pre-commit safe.
-- `build` writes to `dist/<target>/…`; `install` places into the real locations from `InstallLocations`.
+- `build` writes to `dist/<target>/…`; `install` places into the real locations from `InstallPlan`.
 - `list-targets` renders the capability matrix so users know what degrades where.
 
 ---
@@ -375,7 +391,7 @@ The core requirement. Steps to add **Grok**:
 
 1. Create `internal/adapters/grok/grok.go` implementing `adapter.Adapter`.
 2. Declare `Capabilities()` (what Grok supports; fallbacks for the rest).
-3. Implement `Compile()` (pure: IR → files) and `InstallLocations()`.
+3. Implement `Compile()` (pure: IR → files) and `InstallPlan()`.
 4. `func init() { adapter.Register(&Grok{}) }`.
 5. Add golden fixtures under `testdata/grok/` and run the shared **conformance suite**.
 

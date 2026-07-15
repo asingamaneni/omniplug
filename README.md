@@ -13,9 +13,9 @@ End-to-end pipeline (parse → IR → validate → compile → install) with two
 | **claude** | yes | yes | native | yes | yes | yes |
 | **cursor** | yes | yes | rules | yes | yes | yes |
 
-Both targets support every component natively. Where a canonical field has no native home (e.g. an agent's explicit tool allowlist or a fine model tier on Cursor), the adapter degrades it with a diagnostic instead of producing incorrect output. **Codex** is next. Adding it requires only a new adapter package — no changes to the parser, compiler, or CLI.
+Both targets support every component natively. Where a canonical field has no native home, the adapter degrades it with a diagnostic instead of producing incorrect output — e.g. hook matchers are translated from Claude tool names to Cursor tool types (`Bash`→`Shell`, `Edit`→`Write`), a write-denying agent tool config becomes Cursor's `readonly: true`, and untranslatable matchers ship unfiltered with a warning rather than silently never firing. **Codex** is next. Adding it requires only a new adapter package — no changes to the parser, compiler, or CLI.
 
-Output formats were validated against the official Claude Code and Cursor documentation (plugin `hooks.json` wrapping, `.mcp.json` remote-server shape, Cursor `.cursor/hooks.json` + `.cursor/agents/` native formats).
+Output formats were validated against the official Claude Code and Cursor documentation (July 2026): plugin `hooks.json` wrapping and `${CLAUDE_PLUGIN_ROOT}` rewriting, `.mcp.json` shapes, Cursor `hooks.json` v1 events/matchers, `.cursor/agents/` frontmatter (`model`/`readonly`), and `${env:VAR}` interpolation.
 
 ## Install
 
@@ -35,11 +35,12 @@ Or grab a prebuilt binary from [Releases](https://github.com/asingamaneni/omnipl
 ## Usage
 
 ```bash
-omniplug init my-plugin                 # scaffold a canonical plugin source
-omniplug validate -s my-plugin          # schema + per-adapter checks (no writes)
-omniplug build    -s my-plugin -o dist  # compile to dist/<target>/
-omniplug install  -s my-plugin --scope project --dry-run
+omniplug init my-plugin                 # scaffold a canonical plugin source (--force to overwrite)
+omniplug validate -s my-plugin          # schema checks + the same degradation warnings build prints (no writes)
+omniplug build    -s my-plugin -o dist  # compile to dist/<target>/  (-t claude,cursor to select targets)
+omniplug install  -s my-plugin --scope project --dry-run   # --project-dir to target another checkout
 omniplug list-targets                   # registered adapters + capability matrix
+omniplug --version
 ```
 
 Try it against the bundled example:

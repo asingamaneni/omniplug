@@ -9,11 +9,12 @@ weight: 20
 
 | Command | What it does |
 | ------- | ------------ |
-| `omniplug init [name]` | Scaffold a new canonical plugin source. |
-| `omniplug validate -s <src>` | Schema + per-adapter checks. No files written. |
+| `omniplug init [name] [--force]` | Scaffold a new canonical plugin source. Refuses to overwrite existing files unless `--force`. |
+| `omniplug validate -s <src> [-t all\|claude\|cursor]` | Schema checks plus a dry compile per target, so it prints the same degradation warnings `build` does. No files written. |
 | `omniplug build -s <src> -o <dir> [-t all\|claude\|cursor]` | Compile to `<dir>/<target>/`. |
-| `omniplug install -s <src> --scope project\|user [--dry-run]` | Compile and place files in the target's real config location. |
+| `omniplug install -s <src> --scope project\|user [--project-dir <dir>] [--dry-run]` | Compile and place files in the target's real config location. `--project-dir` selects the project for project-scoped installs. |
 | `omniplug list-targets` | Show registered adapters and their capability matrix. |
+| `omniplug --version` | Print the version (ldflags-injected, or the module version for `go install` builds). |
 
 `--dry-run` and `validate` never touch disk, so they're safe in CI and pre-commit hooks.
 
@@ -41,6 +42,9 @@ author:
   name: Your Name
   url: https://github.com/you/my-plugin
 license: MIT
+homepage: https://example.com/my-plugin     # optional; emitted into Claude plugin.json
+repository: https://github.com/you/my-plugin
+keywords: [ai, workflow]
 ```
 
 ## Frontmatter

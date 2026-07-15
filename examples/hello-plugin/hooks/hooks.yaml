@@ -3,3 +3,6 @@ hooks:
     matcher: "Edit|Write"
     type: command
     command: ./hooks/scripts/format.sh
+  - event: Stop
+    type: command
+    command: ./hooks/scripts/format.sh
