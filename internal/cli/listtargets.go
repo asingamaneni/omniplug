@@ -13,12 +13,12 @@ func newListTargetsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list-targets",
 		Short: "List registered target adapters and their capability matrix",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "TARGET\tSKILLS\tMCP\tCOMMANDS\tAGENTS\tHOOKS\tGUIDANCE")
+			_, _ = fmt.Fprintln(w, "TARGET\tSKILLS\tMCP\tCOMMANDS\tAGENTS\tHOOKS\tGUIDANCE")
 			for _, ad := range adapter.All() {
 				c := ad.Capabilities()
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					ad.Name(), yn(c.Skills), yn(c.MCP), string(c.Commands),
 					yn(c.Agents), yn(c.Hooks), yn(c.Guidance))
 			}

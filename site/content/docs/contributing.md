@@ -8,7 +8,7 @@ weight: 40
 ## Development
 
 ```bash
-make setup      # one-time: download deps + install tooling (lint, releaser)
+make setup      # one-time: download deps + install tooling (lint, hugo)
 make demo       # build, then validate + compile the example into ./dist
 make build      # build ./bin/omniplug
 make test       # run tests

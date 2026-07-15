@@ -7,7 +7,7 @@ Thanks for your interest in contributing! Issues and pull requests are welcome.
 ```bash
 git clone https://github.com/asingamaneni/omniplug
 cd omniplug
-make setup      # one-time: download deps + install tooling (lint, releaser)
+make setup      # one-time: download deps + install tooling (lint, hugo)
 make demo       # build, then validate + compile the example into ./dist
 make check      # fmt + vet + test (pre-commit gate)
 ```

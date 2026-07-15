@@ -19,15 +19,15 @@ type fakeAdapter struct {
 
 func (f *fakeAdapter) Name() string                                  { return f.name }
 func (f *fakeAdapter) Capabilities() adapter.Capabilities            { return adapter.Capabilities{} }
-func (f *fakeAdapter) Validate(p *model.Plugin) []adapter.Diagnostic { return nil }
-func (f *fakeAdapter) Compile(p *model.Plugin) (adapter.Bundle, []adapter.Diagnostic, error) {
+func (f *fakeAdapter) Validate(_ *model.Plugin) []adapter.Diagnostic { return nil }
+func (f *fakeAdapter) Compile(_ *model.Plugin) (adapter.Bundle, []adapter.Diagnostic, error) {
 	b := adapter.NewBundle()
 	for k, v := range f.files {
 		b.Add(k, v)
 	}
 	return b, f.diags, nil
 }
-func (f *fakeAdapter) InstallPlan(p *model.Plugin, s adapter.Scope, projectDir string) (adapter.InstallPlan, error) {
+func (f *fakeAdapter) InstallPlan(_ *model.Plugin, _ adapter.Scope, projectDir string) (adapter.InstallPlan, error) {
 	return adapter.InstallPlan{Root: projectDir}, nil
 }
 

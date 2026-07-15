@@ -1,8 +1,10 @@
 package adapter
 
 import (
+	"fmt"
 	"io/fs"
 	"sort"
+	"sync/atomic"
 	"testing"
 
 	"github.com/asingamaneni/omniplug/internal/model"
@@ -12,28 +14,39 @@ type fake struct{ name string }
 
 func (f *fake) Name() string                          { return f.name }
 func (f *fake) Capabilities() Capabilities            { return Capabilities{} }
-func (f *fake) Validate(p *model.Plugin) []Diagnostic { return nil }
-func (f *fake) Compile(p *model.Plugin) (Bundle, []Diagnostic, error) {
+func (f *fake) Validate(_ *model.Plugin) []Diagnostic { return nil }
+func (f *fake) Compile(_ *model.Plugin) (Bundle, []Diagnostic, error) {
 	return NewBundle(), nil, nil
 }
-func (f *fake) InstallPlan(p *model.Plugin, s Scope, projectDir string) (InstallPlan, error) {
+func (f *fake) InstallPlan(_ *model.Plugin, _ Scope, _ string) (InstallPlan, error) {
 	return InstallPlan{}, nil
 }
 
+// nameSeq gives each registration a process-unique name so tests remain
+// idempotent under `go test -count=N` (the registry is process-global and
+// panics on duplicate names, with no reset).
+var nameSeq atomic.Int64
+
+func uniqueName(prefix string) string {
+	return fmt.Sprintf("%s-%d", prefix, nameSeq.Add(1))
+}
+
 func TestRegisterDuplicatePanics(t *testing.T) {
-	Register(&fake{name: "dup-test"})
+	dup := uniqueName("dup")
+	Register(&fake{name: dup})
 	defer func() {
 		if recover() == nil {
 			t.Error("expected panic on duplicate Register")
 		}
 	}()
-	Register(&fake{name: "dup-test"})
+	Register(&fake{name: dup})
 }
 
 func TestRegistryGetAllNames(t *testing.T) {
-	Register(&fake{name: "zz-test"})
-	Register(&fake{name: "aa-test"})
-	if _, ok := Get("zz-test"); !ok {
+	a, b := uniqueName("zz"), uniqueName("aa")
+	Register(&fake{name: a})
+	Register(&fake{name: b})
+	if _, ok := Get(a); !ok {
 		t.Error("Get should find a registered adapter")
 	}
 	if _, ok := Get("never-registered"); ok {
@@ -47,9 +60,9 @@ func TestRegistryGetAllNames(t *testing.T) {
 	if len(all) != len(names) {
 		t.Fatalf("All returned %d adapters, Names %d", len(all), len(names))
 	}
-	for i, a := range all {
-		if a.Name() != names[i] {
-			t.Errorf("All not in Names order at %d: %s vs %s", i, a.Name(), names[i])
+	for i, ad := range all {
+		if ad.Name() != names[i] {
+			t.Errorf("All not in Names order at %d: %s vs %s", i, ad.Name(), names[i])
 		}
 	}
 }

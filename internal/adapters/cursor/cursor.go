@@ -51,7 +51,7 @@ func (a *Adapter) Capabilities() adapter.Capabilities {
 
 // modelTier maps an abstract tier to a Cursor model alias. Cursor's documented
 // vocabulary is "inherit" and "fast"; finer tiers have no alias and are omitted.
-func modelTier(t model.ModelTier) (alias string, expressible bool) {
+func modelTier(t model.Tier) (alias string, expressible bool) {
 	switch t {
 	case model.TierFast:
 		return "fast", true
@@ -135,7 +135,7 @@ func (a *Adapter) Compile(p *model.Plugin) (adapter.Bundle, []adapter.Diagnostic
 // InstallPlan resolves the install root for the given scope. Cursor reads from
 // .cursor/ at the project root or ~/.cursor globally; this adapter writes the
 // .cursor/ subtree, so the install root is the directory that contains it.
-func (a *Adapter) InstallPlan(p *model.Plugin, scope adapter.Scope, projectDir string) (adapter.InstallPlan, error) {
+func (a *Adapter) InstallPlan(_ *model.Plugin, scope adapter.Scope, projectDir string) (adapter.InstallPlan, error) {
 	switch scope {
 	case adapter.ScopeProject:
 		return adapter.InstallPlan{Root: projectDir, Description: "project .cursor/ in " + projectDir}, nil
@@ -360,26 +360,23 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic) {
 				fmt.Sprintf("hook type %q unsupported; Cursor hooks are command processes", h.Type)))
 			continue
 		}
-		// A hook whose matcher cannot be expressed still ships: firing more
-		// broadly with a diagnostic beats silently disabling it.
+		// A hook whose matcher cannot be fully expressed still ships, but with
+		// no matcher so it fires unfiltered: emitting a partially-translated
+		// matcher would silently skip the untranslatable tools (dangerous for a
+		// guard hook). Firing more broadly with a diagnostic is the safe
+		// degradation — the script filters on the stdin tool_name.
 		matcher := ""
 		if h.Matcher != "" {
 			if !matcherOK {
 				ds = append(ds, adapter.Warn(name, "hooks", fmt.Sprintf(
 					"matcher %q dropped for event %q (Cursor does not match tool names on %s); hook fires unfiltered — filter inside the script via the stdin JSON",
 					h.Matcher, h.Event, ev)))
+			} else if translated, droppedToks := cursorMatcher(h.Matcher); len(droppedToks) == 0 {
+				matcher = translated
 			} else {
-				var droppedToks []string
-				matcher, droppedToks = cursorMatcher(h.Matcher)
-				if len(droppedToks) > 0 && matcher == "" {
-					ds = append(ds, adapter.Warn(name, "hooks", fmt.Sprintf(
-						"matcher %q has no Cursor tool-type equivalent; hook fires on every %s — filter inside the script via stdin tool_name",
-						h.Matcher, ev)))
-				} else if len(droppedToks) > 0 {
-					ds = append(ds, adapter.Warn(name, "hooks", fmt.Sprintf(
-						"matcher token(s) %s untranslatable to Cursor tool types; hook may fire more broadly — filter inside the script via stdin tool_name",
-						strings.Join(droppedToks, ", "))))
-				}
+				ds = append(ds, adapter.Warn(name, "hooks", fmt.Sprintf(
+					"matcher %q has token(s) %s with no Cursor tool-type equivalent; hook fires unfiltered on every %s — filter inside the script via stdin tool_name",
+					h.Matcher, strings.Join(droppedToks, ", "), ev)))
 			}
 		}
 		byEvent[ev] = append(byEvent[ev], entry{Command: cursorCommand(h.Command), Matcher: matcher})

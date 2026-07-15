@@ -19,7 +19,7 @@ func newGenDocsCmd() *cobra.Command {
 		Use:    "gen-docs",
 		Short:  "Generate the CLI command reference (Markdown) for the docs site",
 		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return err
 			}

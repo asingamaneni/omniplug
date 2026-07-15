@@ -100,7 +100,7 @@ func TestHookCommandUsesPluginRoot(t *testing.T) {
 	}
 }
 
-func TestModelTierMapping(t *testing.T) {
+func TestTierMapping(t *testing.T) {
 	b := compile(t)
 	skill := string(b.Files["skills/deploy/SKILL.md"])
 	if !strings.Contains(skill, "model: sonnet") {

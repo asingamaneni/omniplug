@@ -8,21 +8,22 @@ import "io/fs"
 // APIVersion is the schema version the IR currently targets.
 const APIVersion = "omniplug/v1"
 
-// ModelTier is an abstract model capability tier. Raw provider model IDs are
+// Tier is an abstract model capability tier. Raw provider model IDs are
 // meaningless across tools, so the canonical format uses tiers and each adapter
 // maps them to its own model identifiers.
-type ModelTier string
+type Tier string
 
+// Abstract model capability tiers. TierUnset is the empty default.
 const (
-	TierUnset    ModelTier = ""
-	TierFast     ModelTier = "fast"
-	TierBalanced ModelTier = "balanced"
-	TierPowerful ModelTier = "powerful"
-	TierInherit  ModelTier = "inherit"
+	TierUnset    Tier = ""
+	TierFast     Tier = "fast"
+	TierBalanced Tier = "balanced"
+	TierPowerful Tier = "powerful"
+	TierInherit  Tier = "inherit"
 )
 
-// ValidModelTiers lists the accepted tier values (excluding the empty default).
-var ValidModelTiers = []ModelTier{TierFast, TierBalanced, TierPowerful, TierInherit}
+// ValidTiers lists the accepted tier values (excluding the empty default).
+var ValidTiers = []Tier{TierFast, TierBalanced, TierPowerful, TierInherit}
 
 // ValidEfforts lists accepted effort levels (excluding the empty default).
 var ValidEfforts = []string{"low", "medium", "high", "xhigh", "max"}
@@ -69,7 +70,7 @@ type Skill struct {
 	UserInvocable   *bool // nil = default (true)
 	AllowedTools    []string
 	DisallowedTools []string
-	Model           ModelTier
+	Model           Tier
 	Effort          string
 	Globs           []string
 	RunInSubagent   bool
@@ -85,7 +86,7 @@ type Command struct {
 	Description  string
 	ArgumentHint string
 	AllowedTools []string
-	Model        ModelTier
+	Model        Tier
 	Body         string
 
 	Targets map[string]map[string]any
@@ -97,7 +98,7 @@ type Agent struct {
 	Description     string
 	Tools           []string
 	DisallowedTools []string
-	Model           ModelTier
+	Model           Tier
 	MaxTurns        int
 	Color           string
 	Body            string

@@ -14,7 +14,7 @@ func newValidateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate a canonical plugin source without writing files (schema, adapter checks, and compile diagnostics)",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			p, err := parser.Load(src)
 			if err != nil {
 				return err
