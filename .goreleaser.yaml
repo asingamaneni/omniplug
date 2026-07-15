@@ -1,0 +1,65 @@
+# GoReleaser configuration — https://goreleaser.com
+# Validate with: make release-check
+# Release locally (no publish): make snapshot
+version: 2
+
+project_name: omniplug
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: omniplug
+    main: ./cmd/omniplug
+    binary: omniplug
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/asingamaneni/omniplug/internal/cli.version={{ .Version }}
+
+archives:
+  - id: default
+    # Asset name the npm installer expects: omniplug_<os>_<arch>.<ext>
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+
+# Publishes a formula to a separate Homebrew tap repo.
+# Prerequisites:
+#   1. Create a repo named `homebrew-tap` under your account/org.
+#   2. Add a repo secret HOMEBREW_TAP_TOKEN (a PAT with `contents:write` on that tap).
+# Users then: brew install asingamaneni/tap/omniplug
+brews:
+  - name: omniplug
+    repository:
+      owner: asingamaneni
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/asingamaneni/omniplug"
+    description: "Compile a tool-neutral AI plugin into Claude/Cursor/Codex layouts"
+    license: "MIT"
+    commit_author:
+      name: goreleaser-bot
+      email: goreleaser@users.noreply.github.com
+    test: |
+      system "#{bin}/omniplug", "--version"
+
+release:
+  prerelease: auto

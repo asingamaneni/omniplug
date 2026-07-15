@@ -1,0 +1,19 @@
+# golangci-lint v2 configuration — https://golangci-lint.run
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unused
+
+formatters:
+  enable:
+    - gofmt

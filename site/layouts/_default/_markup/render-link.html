@@ -1,0 +1,12 @@
+{{- $u := urls.Parse .Destination -}}
+{{- $remote := or (ne $u.Scheme "") (strings.HasPrefix .Destination "//") -}}
+{{- $href := .Destination -}}
+{{- if and (not $remote) $u.Path -}}
+  {{- with try (relref .Page $u.Path) -}}
+    {{- if not .Err -}}
+      {{- $href = .Value -}}
+      {{- with $u.Fragment }}{{ $href = printf "%s#%s" $href . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+<a href="{{ $href | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text | safeHTML }}</a>

@@ -1,0 +1,25 @@
+# Build artifacts
+/dist/
+/bin/
+omniplug
+*.exe
+
+# Go
+*.test
+*.out
+coverage.out
+/vendor/
+
+# Hugo docs site (build output + generated reference)
+/site/public/
+/site/resources/
+/site/.hugo_build.lock
+/site/content/docs/reference/
+
+# npm wrapper (downloaded binary + deps)
+npm/bin/omniplug-bin
+npm/bin/omniplug.exe
+node_modules/
+
+# OS
+.DS_Store

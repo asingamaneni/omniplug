@@ -1,0 +1,8 @@
+apiVersion: omniplug/v1
+name: hello-plugin
+version: 0.1.0
+description: Example plugin exercising every omniplug component.
+author:
+  name: Ashok
+  url: https://github.com/asingamaneni/omniplug
+license: MIT

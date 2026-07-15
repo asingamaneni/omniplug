@@ -1,0 +1,5 @@
+hooks:
+  - event: PostToolUse
+    matcher: "Edit|Write"
+    type: command
+    command: ./hooks/scripts/format.sh

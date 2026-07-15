@@ -1,0 +1,25 @@
+{
+  "name": "omniplug",
+  "version": "0.0.0",
+  "description": "Compile a tool-neutral AI plugin into Claude/Cursor/Codex layouts",
+  "keywords": ["claude", "cursor", "codex", "ai", "plugin", "cli", "mcp", "skills"],
+  "homepage": "https://github.com/asingamaneni/omniplug",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asingamaneni/omniplug.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "omniplug": "bin/omniplug.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "bin/omniplug.js",
+    "install.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

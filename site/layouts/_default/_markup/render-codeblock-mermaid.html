@@ -1,0 +1,5 @@
+{{/* Render ```mermaid fenced code blocks as Mermaid diagrams. The default Go
+     template auto-escaping turns characters like <br/> into text that Mermaid
+     reads correctly from the element's textContent. */}}
+<pre class="mermaid">{{ .Inner }}</pre>
+{{ .Page.Store.Set "hasMermaid" true }}
