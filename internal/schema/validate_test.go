@@ -84,3 +84,69 @@ func TestRejectsInvalidHookTypeAndTransport(t *testing.T) {
 		t.Error("expected errors for invalid hook type and transport")
 	}
 }
+
+func TestRejectsNonCommandHookTypes(t *testing.T) {
+	// The IR carries no payload for these, so accepting them would emit
+	// structurally broken hooks. They must be schema errors in omniplug/v1.
+	for _, typ := range []string{"http", "mcp_tool", "prompt", "agent"} {
+		p := &model.Plugin{Name: "ok", Hooks: []model.Hook{{Event: "PostToolUse", Type: typ}}}
+		if !adapter.HasErrors(Validate(p)) {
+			t.Errorf("expected error for hook type %q", typ)
+		}
+	}
+}
+
+func TestRejectsCommandHookWithoutCommand(t *testing.T) {
+	for _, typ := range []string{"", "command"} {
+		p := &model.Plugin{Name: "ok", Hooks: []model.Hook{{Event: "PostToolUse", Type: typ}}}
+		if !adapter.HasErrors(Validate(p)) {
+			t.Errorf("expected error for command hook (type %q) with empty command", typ)
+		}
+	}
+}
+
+func TestMCPRequiredFieldsPerTransport(t *testing.T) {
+	cases := []struct {
+		name    string
+		srv     model.MCPServer
+		wantErr bool
+	}{
+		{"stdio without command", model.MCPServer{Name: "a", Transport: "stdio"}, true},
+		{"http without url", model.MCPServer{Name: "b", Transport: "http"}, true},
+		{"sse without url", model.MCPServer{Name: "c", Transport: "sse"}, true},
+		{"stdio ok", model.MCPServer{Name: "d", Transport: "stdio", Command: "npx"}, false},
+		{"http ok", model.MCPServer{Name: "e", Transport: "http", URL: "https://x"}, false},
+	}
+	for _, tc := range cases {
+		p := &model.Plugin{Name: "ok", MCPServers: []model.MCPServer{tc.srv}}
+		if got := adapter.HasErrors(Validate(p)); got != tc.wantErr {
+			t.Errorf("%s: HasErrors = %v, want %v", tc.name, got, tc.wantErr)
+		}
+	}
+}
+
+func TestMCPIgnoredCrossTransportFieldWarns(t *testing.T) {
+	p := &model.Plugin{Name: "ok", MCPServers: []model.MCPServer{
+		{Name: "a", Transport: "stdio", Command: "npx", URL: "https://ignored"},
+	}}
+	ds := Validate(p)
+	if adapter.HasErrors(ds) {
+		t.Errorf("ignored url on stdio should warn, not error: %+v", ds)
+	}
+	if len(ds) == 0 {
+		t.Error("expected a warning for ignored 'url' on stdio transport")
+	}
+}
+
+func TestEffortEnumMatchesClaude(t *testing.T) {
+	for _, e := range []string{"low", "medium", "high", "xhigh", "max"} {
+		p := &model.Plugin{Name: "ok", Skills: []model.Skill{{Name: "s", Description: "d", Effort: e}}}
+		if adapter.HasErrors(Validate(p)) {
+			t.Errorf("effort %q should be valid", e)
+		}
+	}
+	p := &model.Plugin{Name: "ok", Skills: []model.Skill{{Name: "s", Description: "d", Effort: "extreme"}}}
+	if !adapter.HasErrors(Validate(p)) {
+		t.Error("expected error for effort \"extreme\"")
+	}
+}

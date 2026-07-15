@@ -151,6 +151,37 @@ func contains(s, sub string) bool {
 	return false
 }
 
+func TestManifestMetadataFields(t *testing.T) {
+	dir := t.TempDir()
+	manifest := "name: meta\nlicense: MIT\nhomepage: https://example.com\nrepository: https://github.com/x/meta\nkeywords: [ai, plugin]\n"
+	if err := os.WriteFile(filepath.Join(dir, "plugin.yaml"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if p.License != "MIT" || p.Homepage != "https://example.com" || p.Repository != "https://github.com/x/meta" {
+		t.Errorf("metadata not parsed: %+v", p)
+	}
+	if len(p.Keywords) != 2 || p.Keywords[0] != "ai" {
+		t.Errorf("keywords = %v, want [ai plugin]", p.Keywords)
+	}
+}
+
+func TestMissingManifestFriendlyError(t *testing.T) {
+	_, err := Load(t.TempDir())
+	if err == nil {
+		t.Fatal("expected error for missing plugin.yaml")
+	}
+	if !contains(err.Error(), "no plugin.yaml found") || !contains(err.Error(), "omniplug init") {
+		t.Errorf("error should point at plugin.yaml and suggest init, got: %v", err)
+	}
+	if contains(err.Error(), "lstat") {
+		t.Errorf("error should not leak syscall details: %v", err)
+	}
+}
+
 func TestSplitToolsUnit(t *testing.T) {
 	got := splitTools("Bash(git push *) Read, Grep")
 	want := []string{"Bash(git push *)", "Read", "Grep"}

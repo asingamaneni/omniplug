@@ -25,7 +25,7 @@ const (
 var ValidModelTiers = []ModelTier{TierFast, TierBalanced, TierPowerful, TierInherit}
 
 // ValidEfforts lists accepted effort levels (excluding the empty default).
-var ValidEfforts = []string{"low", "medium", "high"}
+var ValidEfforts = []string{"low", "medium", "high", "xhigh", "max"}
 
 // Plugin is the canonical representation of a plugin source tree.
 type Plugin struct {
@@ -35,6 +35,9 @@ type Plugin struct {
 	Description string
 	Author      Author
 	License     string
+	Homepage    string
+	Repository  string
+	Keywords    []string
 
 	Skills     []Skill
 	Commands   []Command
@@ -106,8 +109,8 @@ type Agent struct {
 type Hook struct {
 	Event   string // canonical event name (e.g. PostToolUse)
 	Matcher string // tool-name matcher pattern
-	Type    string // command|http|mcp_tool|prompt|agent
-	Command string // command to run (for type=command)
+	Type    string // "command" (the only supported type in omniplug/v1)
+	Command string // command to run
 }
 
 // MCPServer is a neutral MCP server definition.

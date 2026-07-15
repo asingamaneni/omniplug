@@ -4,8 +4,10 @@ package parser
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -31,6 +33,9 @@ const (
 func Load(dir string) (*model.Plugin, error) {
 	man, err := loadManifest(filepath.Join(dir, manifestFile))
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("no %s found in %s (run 'omniplug init' to scaffold a plugin)", manifestFile, dir)
+		}
 		return nil, err
 	}
 
@@ -41,6 +46,9 @@ func Load(dir string) (*model.Plugin, error) {
 		Description: man.Description,
 		Author:      model.Author{Name: man.Author.Name, URL: man.Author.URL},
 		License:     man.License,
+		Homepage:    man.Homepage,
+		Repository:  man.Repository,
+		Keywords:    man.Keywords,
 		Targets:     man.Targets,
 	}
 	if p.Version == "" {
@@ -83,8 +91,11 @@ type rawManifest struct {
 		Name string `yaml:"name"`
 		URL  string `yaml:"url"`
 	} `yaml:"author"`
-	License string                            `yaml:"license"`
-	Targets map[string]map[string]interface{} `yaml:"targets"`
+	License    string                            `yaml:"license"`
+	Homepage   string                            `yaml:"homepage"`
+	Repository string                            `yaml:"repository"`
+	Keywords   []string                          `yaml:"keywords"`
+	Targets    map[string]map[string]interface{} `yaml:"targets"`
 }
 
 func loadManifest(path string) (*rawManifest, error) {

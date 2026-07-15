@@ -16,9 +16,10 @@ const source = "schema"
 // preventing path-traversal via crafted skill/command/agent/plugin names.
 var nameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
-var validHookTypes = map[string]bool{
-	"command": true, "http": true, "mcp_tool": true, "prompt": true, "agent": true,
-}
+// validHookTypes is intentionally command-only: the IR has no payload fields
+// for other hook kinds yet, so accepting them would emit broken output.
+var validHookTypes = map[string]bool{"command": true}
+
 var validTransports = map[string]bool{"stdio": true, "http": true, "sse": true}
 
 // Validate checks structural rules: required fields, safe names, enum membership,
@@ -62,13 +63,7 @@ func Validate(p *model.Plugin) []adapter.Diagnostic {
 		ds = append(ds, checkModel(comp, a.Model)...)
 	}
 	for _, h := range p.Hooks {
-		if h.Event == "" {
-			ds = append(ds, adapter.Error(source, "hooks", "hook is missing required 'event'"))
-		}
-		if h.Type != "" && !validHookTypes[h.Type] {
-			ds = append(ds, adapter.Error(source, "hooks",
-				fmt.Sprintf("invalid hook type %q (want command, http, mcp_tool, prompt, or agent)", h.Type)))
-		}
+		ds = append(ds, checkHook(h)...)
 	}
 	mcpNames := map[string]bool{}
 	for _, m := range p.MCPServers {
@@ -79,10 +74,55 @@ func Validate(p *model.Plugin) []adapter.Diagnostic {
 			// MCP names become JSON map keys; duplicates would silently drop a server.
 			ds = append(ds, checkDup(comp, m.Name, mcpNames)...)
 		}
-		if m.Transport != "" && !validTransports[m.Transport] {
-			ds = append(ds, adapter.Error(source, comp,
-				fmt.Sprintf("invalid transport %q (want stdio, http, or sse)", m.Transport)))
+		ds = append(ds, checkMCPServer(comp, m)...)
+	}
+	return ds
+}
+
+// checkHook enforces that a hook can actually be emitted: a known event, a
+// supported type, and a non-empty command (adapters serialize Command verbatim,
+// so an empty one would produce a hook entry that does nothing).
+func checkHook(h model.Hook) []adapter.Diagnostic {
+	var ds []adapter.Diagnostic
+	if h.Event == "" {
+		ds = append(ds, adapter.Error(source, "hooks", "hook is missing required 'event'"))
+	}
+	if h.Type != "" && !validHookTypes[h.Type] {
+		ds = append(ds, adapter.Error(source, "hooks",
+			fmt.Sprintf("invalid hook type %q (only \"command\" is supported in %s)", h.Type, model.APIVersion)))
+	} else if h.Command == "" {
+		ds = append(ds, adapter.Error(source, "hooks",
+			fmt.Sprintf("command hook for event %q is missing required 'command'", h.Event)))
+	}
+	return ds
+}
+
+// checkMCPServer enforces per-transport required fields so adapters never
+// serialize a server that its host cannot load (stdio without a command,
+// http/sse without a url), and warns about fields the transport ignores.
+func checkMCPServer(comp string, m model.MCPServer) []adapter.Diagnostic {
+	var ds []adapter.Diagnostic
+	switch m.Transport {
+	case "", "stdio":
+		if m.Command == "" {
+			ds = append(ds, adapter.Error(source, comp, "stdio MCP server requires 'command'"))
 		}
+		if m.URL != "" {
+			ds = append(ds, adapter.Warn(source, comp,
+				"'url' is ignored for stdio transport (did you mean transport: http or sse?)"))
+		}
+	case "http", "sse":
+		if m.URL == "" {
+			ds = append(ds, adapter.Error(source, comp,
+				fmt.Sprintf("%s MCP server requires 'url'", m.Transport)))
+		}
+		if m.Command != "" {
+			ds = append(ds, adapter.Warn(source, comp,
+				fmt.Sprintf("'command' is ignored for %s transport", m.Transport)))
+		}
+	default:
+		ds = append(ds, adapter.Error(source, comp,
+			fmt.Sprintf("invalid transport %q (want stdio, http, or sse)", m.Transport)))
 	}
 	return ds
 }
@@ -141,5 +181,5 @@ func checkEffort(comp, e string) []adapter.Diagnostic {
 		}
 	}
 	return []adapter.Diagnostic{adapter.Error(source, comp,
-		fmt.Sprintf("invalid effort %q (want one of low, medium, high)", e))}
+		fmt.Sprintf("invalid effort %q (want one of low, medium, high, xhigh, max)", e))}
 }
