@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/scripts/format.sh",
+        "matcher": "Write"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/scripts/format.sh"
+      }
+    ]
+  },
+  "version": 1
+}

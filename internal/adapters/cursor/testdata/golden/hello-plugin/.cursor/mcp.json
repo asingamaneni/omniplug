@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "docs": {
+      "url": "https://mcp.internal/docs"
+    },
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+      }
+    }
+  }
+}
