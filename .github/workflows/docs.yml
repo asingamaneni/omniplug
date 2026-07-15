@@ -45,7 +45,7 @@ jobs:
         run: go run ./cmd/omniplug gen-docs --dir site/content/docs/reference
       - name: Build site
         run: hugo --gc --minify --source site --baseURL "${{ steps.pages.outputs.base_url }}/"
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site/public
 
