@@ -2,7 +2,7 @@
 
 Author an AI agent plugin **once** in a tool-neutral canonical format, then compile or install it into target-specific layouts. Claude Code and Cursor are supported today; Codex and future tools (Grok, Gemini CLI, …) slot in by implementing one adapter — no changes to the core.
 
-Docs: **https://asingamaneni.github.io/omniplug** · Design: [`site/content/docs/architecture.md`](site/content/docs/architecture.md)
+Docs: **[asingamaneni.github.io/omniplug](https://asingamaneni.github.io/omniplug/)** — [Installation](https://asingamaneni.github.io/omniplug/docs/installation/) · [Usage](https://asingamaneni.github.io/omniplug/docs/usage/) · [Architecture](https://asingamaneni.github.io/omniplug/docs/architecture/)
 
 ## Status
 
@@ -42,6 +42,8 @@ omniplug install  -s my-plugin --scope project --dry-run   # --project-dir to ta
 omniplug list-targets                   # registered adapters + capability matrix
 omniplug --version
 ```
+
+Full command reference, flags, and the canonical frontmatter schema: **[Usage guide →](https://asingamaneni.github.io/omniplug/docs/usage/)**
 
 Try it against the bundled example:
 
