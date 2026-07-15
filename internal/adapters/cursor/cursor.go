@@ -167,27 +167,65 @@ func compileSkill(s model.Skill) ([]byte, []adapter.Diagnostic) {
 		b.Bool("disable-model-invocation", true)
 	}
 	b.Targets(s.Targets[name])
+
+	// Cursor SKILL.md frontmatter supports name/description/model/
+	// disable-model-invocation; everything else degrades with a diagnostic.
+	var dropped []string
+	if s.Effort != "" {
+		dropped = append(dropped, "effort")
+	}
+	if s.ArgumentHint != "" {
+		dropped = append(dropped, "argumentHint")
+	}
+	if len(s.Arguments) > 0 {
+		dropped = append(dropped, "arguments")
+	}
+	if len(s.Globs) > 0 {
+		dropped = append(dropped, "globs")
+	}
+	if s.RunInSubagent {
+		dropped = append(dropped, "runInSubagent")
+	}
+	if s.UserInvocable != nil && !*s.UserInvocable {
+		dropped = append(dropped, "userInvocable")
+	}
+	if len(dropped) > 0 {
+		ds = append(ds, adapter.Warn(name, "skill:"+s.Name,
+			"Cursor SKILL.md does not support "+strings.Join(dropped, ", ")+"; dropped"))
+	}
 	return b.Render(s.Body), ds
 }
 
 func compileAgent(ag model.Agent) ([]byte, []adapter.Diagnostic) {
 	var ds []adapter.Diagnostic
 	b := &yamlfm.Builder{}
-	// Cursor subagent frontmatter recognizes only name and description; the
-	// name must match the filename stem. The markdown body is the system prompt.
+	// Cursor subagent frontmatter (1.7+): name, description, model, readonly,
+	// is_background. The name must match the filename stem; the markdown body
+	// is the system prompt.
 	b.Scalar("name", ag.Name)
 	b.Scalar("description", ag.Description)
+	if alias, ok := modelTier(ag.Model); !ok {
+		ds = append(ds, adapter.Warn(name, "agent:"+ag.Name,
+			fmt.Sprintf("model tier %q has no Cursor alias; subagent inherits the parent model", ag.Model)))
+	} else {
+		b.Raw("model", alias)
+	}
+	readonly := agentReadonly(ag)
+	if readonly {
+		b.Bool("readonly", true)
+	}
 	b.Targets(ag.Targets[name])
 
 	var dropped []string
-	if ag.Model != model.TierUnset {
-		dropped = append(dropped, "model")
-	}
-	if len(ag.Tools) > 0 {
-		dropped = append(dropped, "tools")
-	}
-	if len(ag.DisallowedTools) > 0 {
-		dropped = append(dropped, "disallowedTools")
+	if len(ag.Tools) > 0 || len(ag.DisallowedTools) > 0 {
+		if readonly {
+			// readonly is at least as restrictive as the canonical config, so
+			// this degrades toward safety rather than silently widening access.
+			ds = append(ds, adapter.Warn(name, "agent:"+ag.Name,
+				"tool restrictions approximated by readonly: true (Cursor has no per-tool lists)"))
+		} else {
+			dropped = append(dropped, "tools/disallowedTools")
+		}
 	}
 	if ag.MaxTurns > 0 {
 		dropped = append(dropped, "maxTurns")
@@ -197,26 +235,110 @@ func compileAgent(ag model.Agent) ([]byte, []adapter.Diagnostic) {
 	}
 	if len(dropped) > 0 {
 		ds = append(ds, adapter.Warn(name, "agent:"+ag.Name,
-			"Cursor subagents support only name/description; dropped "+strings.Join(dropped, ", ")))
+			"Cursor subagents cannot express "+strings.Join(dropped, ", ")+"; dropped"))
 	}
 	return b.Render(ag.Body), ds
 }
 
-// cursorHookEvent maps a canonical (Claude-style) event to Cursor's camelCase
-// event name. Unknown events return ok=false.
-func cursorHookEvent(e string) (string, bool) {
+// writeTools are canonical tool names that grant write or exec power.
+var writeTools = map[string]bool{
+	"Write": true, "Edit": true, "MultiEdit": true, "NotebookEdit": true, "Bash": true,
+}
+
+// agentReadonly reports whether the agent's canonical tool config denies
+// writes: either DisallowedTools covers Write and Edit, or an explicit Tools
+// allowlist grants no write/exec tool. Cursor's readonly flag is at least as
+// restrictive as either form, so mapping to it never widens access.
+func agentReadonly(ag model.Agent) bool {
+	denied := map[string]bool{}
+	for _, t := range ag.DisallowedTools {
+		denied[t] = true
+	}
+	if denied["Write"] && denied["Edit"] {
+		return true
+	}
+	if len(ag.Tools) == 0 {
+		return false
+	}
+	for _, t := range ag.Tools {
+		// A pattern like Bash(git push *) still grants exec power.
+		base := t
+		if i := strings.IndexByte(base, '('); i >= 0 {
+			base = base[:i]
+		}
+		if writeTools[base] {
+			return false
+		}
+	}
+	return true
+}
+
+// cursorHookEvent maps a canonical (Claude-style) event to a Cursor hooks.json
+// v1 event. matcherOK reports whether Cursor matches tool types on that event.
+// Unknown events return ok=false. Event names verified against
+// https://cursor.com/docs/agent/hooks (hooks.json version 1, July 2026).
+func cursorHookEvent(e string) (event string, matcherOK, ok bool) {
 	switch e {
 	case "PreToolUse":
-		return "preToolUse", true
+		return "preToolUse", true, true
 	case "PostToolUse":
-		return "postToolUse", true
+		return "postToolUse", true, true
+	// Cursor matches subagent *types* (e.g. explore|shell) on subagent events;
+	// canonical matchers carry Claude agent names, which are untranslatable.
 	case "SubagentStart":
-		return "subagentStart", true
+		return "subagentStart", false, true
 	case "SubagentStop":
-		return "subagentStop", true
+		return "subagentStop", false, true
+	case "Stop":
+		return "stop", false, true
+	case "SessionStart":
+		return "sessionStart", false, true
+	case "SessionEnd":
+		return "sessionEnd", false, true
+	case "PreCompact":
+		return "preCompact", false, true
+	case "UserPromptSubmit":
+		return "beforeSubmitPrompt", false, true
 	default:
-		return "", false
+		return "", false, false
 	}
+}
+
+// cursorToolTypes translates Claude tool names into Cursor's matcher
+// vocabulary (tool types). Claude's edit-family tools all surface as Cursor
+// "Write" operations.
+var cursorToolTypes = map[string]string{
+	"Bash":         "Shell",
+	"Edit":         "Write",
+	"Write":        "Write",
+	"MultiEdit":    "Write",
+	"NotebookEdit": "Write",
+	"Read":         "Read",
+	"Grep":         "Grep",
+	"Task":         "Task",
+}
+
+// cursorMatcher translates a Claude tool-name alternation ("Edit|Write") into
+// Cursor's tool-type vocabulary ("Write"). dropped lists untranslatable
+// tokens (MCP tools, Bash(...) patterns, unknown names).
+func cursorMatcher(m string) (translated string, dropped []string) {
+	var out []string
+	seen := map[string]bool{}
+	for _, tok := range strings.Split(m, "|") {
+		tok = strings.TrimSpace(tok)
+		if tok == "" {
+			continue
+		}
+		if t, ok := cursorToolTypes[tok]; ok {
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
+			continue
+		}
+		dropped = append(dropped, tok)
+	}
+	return strings.Join(out, "|"), dropped
 }
 
 func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic) {
@@ -227,7 +349,7 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic) {
 	}
 	byEvent := map[string][]entry{}
 	for _, h := range hooks {
-		ev, ok := cursorHookEvent(h.Event)
+		ev, matcherOK, ok := cursorHookEvent(h.Event)
 		if !ok {
 			ds = append(ds, adapter.Warn(name, "hooks",
 				fmt.Sprintf("event %q has no Cursor equivalent; dropped", h.Event)))
@@ -238,7 +360,29 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic) {
 				fmt.Sprintf("hook type %q unsupported; Cursor hooks are command processes", h.Type)))
 			continue
 		}
-		byEvent[ev] = append(byEvent[ev], entry{Command: cursorCommand(h.Command), Matcher: h.Matcher})
+		// A hook whose matcher cannot be expressed still ships: firing more
+		// broadly with a diagnostic beats silently disabling it.
+		matcher := ""
+		if h.Matcher != "" {
+			if !matcherOK {
+				ds = append(ds, adapter.Warn(name, "hooks", fmt.Sprintf(
+					"matcher %q dropped for event %q (Cursor does not match tool names on %s); hook fires unfiltered — filter inside the script via the stdin JSON",
+					h.Matcher, h.Event, ev)))
+			} else {
+				var droppedToks []string
+				matcher, droppedToks = cursorMatcher(h.Matcher)
+				if len(droppedToks) > 0 && matcher == "" {
+					ds = append(ds, adapter.Warn(name, "hooks", fmt.Sprintf(
+						"matcher %q has no Cursor tool-type equivalent; hook fires on every %s — filter inside the script via stdin tool_name",
+						h.Matcher, ev)))
+				} else if len(droppedToks) > 0 {
+					ds = append(ds, adapter.Warn(name, "hooks", fmt.Sprintf(
+						"matcher token(s) %s untranslatable to Cursor tool types; hook may fire more broadly — filter inside the script via stdin tool_name",
+						strings.Join(droppedToks, ", "))))
+				}
+			}
+		}
+		byEvent[ev] = append(byEvent[ev], entry{Command: cursorCommand(h.Command), Matcher: matcher})
 	}
 	if len(byEvent) == 0 {
 		return nil, ds
