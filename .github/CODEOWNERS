@@ -1,0 +1,8 @@
+# Code owners for omniplug.
+#
+# Listed owners are automatically requested for review when someone opens a
+# pull request that changes owned files. The last matching pattern wins.
+# Docs: https://docs.github.com/articles/about-code-owners
+
+# Default owner for everything in the repository.
+* @asingamaneni
