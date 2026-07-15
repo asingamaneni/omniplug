@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/asingamaneni/omniplug/internal/adapter"
 	"github.com/asingamaneni/omniplug/internal/compiler"
@@ -34,7 +35,12 @@ func newInstallCmd() *cobra.Command {
 			if len(diags) > 0 {
 				printDiagnostics(diags)
 			}
+			var failed []string
 			for _, r := range results {
+				if r.HasErrors() {
+					failed = append(failed, r.Target)
+					continue
+				}
 				ad, _ := adapter.Get(r.Target)
 				plan, err := ad.InstallPlan(p, sc, projectDir)
 				if err != nil {
@@ -48,7 +54,10 @@ func newInstallCmd() *cobra.Command {
 				if dryRun {
 					verb = "would install"
 				}
-				fmt.Printf("%s %s -> %s [%s] (%d files)\n", verb, r.Target, plan.Root, plan.Description, len(wr.Written))
+				fmt.Printf("%s %s -> %s [%s] (%s)\n", verb, r.Target, plan.Root, plan.Description, countNoun(len(wr.Written), "file"))
+			}
+			if len(failed) > 0 {
+				return fmt.Errorf("target(s) %s failed with errors; nothing written for them", strings.Join(failed, ", "))
 			}
 			return nil
 		},

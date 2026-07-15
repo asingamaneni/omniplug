@@ -17,6 +17,10 @@ type Result struct {
 	Diagnostics []adapter.Diagnostic
 }
 
+// HasErrors reports whether this target's diagnostics include an error.
+// Callers must not write a bundle whose Result has errors.
+func (r Result) HasErrors() bool { return adapter.HasErrors(r.Diagnostics) }
+
 // ResolveTargets expands "all" into every registered adapter name, or validates
 // the requested names.
 func ResolveTargets(requested []string) ([]string, error) {

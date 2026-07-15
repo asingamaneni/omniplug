@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/asingamaneni/omniplug/internal/compiler"
 	"github.com/asingamaneni/omniplug/internal/installer"
@@ -29,13 +30,21 @@ func newBuildCmd() *cobra.Command {
 			if len(diags) > 0 {
 				printDiagnostics(diags)
 			}
+			var failed []string
 			for _, r := range results {
+				if r.HasErrors() {
+					failed = append(failed, r.Target)
+					continue
+				}
 				root := filepath.Join(out, r.Target)
 				wr, err := installer.Write(r.Bundle, root, false)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("built %s -> %s (%d files)\n", r.Target, root, len(wr.Written))
+				fmt.Printf("built %s -> %s (%s)\n", r.Target, root, countNoun(len(wr.Written), "file"))
+			}
+			if len(failed) > 0 {
+				return fmt.Errorf("target(s) %s failed with errors; nothing written for them", strings.Join(failed, ", "))
 			}
 			return nil
 		},
