@@ -18,7 +18,7 @@ func newInstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Compile and install the plugin into a target's real config location",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			sc := adapter.Scope(scope)
 			if sc != adapter.ScopeProject && sc != adapter.ScopeUser {
 				return fmt.Errorf("invalid --scope %q (want project|user)", scope)

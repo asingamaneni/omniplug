@@ -9,8 +9,10 @@
    - `HOMEBREW_TAP_TOKEN` — a fine-grained PAT with `contents: write` on
      `homebrew-tap` (the default `GITHUB_TOKEN` cannot push to another repo).
    - `NPM_TOKEN` — an npm automation token that can publish `omniplug`.
-3. **GitHub Pages** — Settings → Pages → Source: **GitHub Actions**
-   (otherwise the `docs.yml` deploy step fails; CI builds still pass).
+3. **GitHub Pages** — `docs.yml` auto-enables Pages (Actions source) via
+   `configure-pages` on its first run. If your org restricts that, set it
+   manually: Settings → Pages → Source: **GitHub Actions**. (The `ci.yml`
+   build/test/lint jobs are independent and pass regardless.)
 
 ## Cutting a release
 

@@ -167,7 +167,7 @@ func loadSkills(dir string) ([]model.Skill, error) {
 			UserInvocable:   fm.UserInvocable,
 			AllowedTools:    fm.AllowedTools,
 			DisallowedTools: fm.DisallowedTools,
-			Model:           model.ModelTier(fm.Model),
+			Model:           model.Tier(fm.Model),
 			Effort:          fm.Effort,
 			Globs:           fm.Globs,
 			RunInSubagent:   fm.RunInSubagent,
@@ -214,7 +214,7 @@ func loadCommands(dir string) ([]model.Command, error) {
 			Description:  fm.Description,
 			ArgumentHint: fm.ArgumentHint,
 			AllowedTools: fm.AllowedTools,
-			Model:        model.ModelTier(fm.Model),
+			Model:        model.Tier(fm.Model),
 			Body:         body,
 			Targets:      fm.Targets,
 		})
@@ -259,7 +259,7 @@ func loadAgents(dir string) ([]model.Agent, error) {
 			Description:     fm.Description,
 			Tools:           fm.Tools,
 			DisallowedTools: fm.DisallowedTools,
-			Model:           model.ModelTier(fm.Model),
+			Model:           model.Tier(fm.Model),
 			MaxTurns:        fm.MaxTurns,
 			Color:           fm.Color,
 			Body:            body,
@@ -459,7 +459,7 @@ func readFileCapped(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data, err := io.ReadAll(io.LimitReader(f, maxFileBytes+1))
 	if err != nil {
 		return nil, err

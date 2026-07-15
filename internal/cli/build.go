@@ -17,7 +17,7 @@ func newBuildCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build",
 		Short: "Compile the plugin to dist/<target>/ for one or more targets",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			p, err := parser.Load(src)
 			if err != nil {
 				return err

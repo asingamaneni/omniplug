@@ -204,7 +204,7 @@ Argument substitution (`$ARGUMENTS`, `$1`, `$name`) is a shared convention acros
 
 #### Agent (subagent) frontmatter
 
-Richest on Claude; Codex and Cursor (native `.cursor/agents/*.md`, since 1.7) support a narrower field set and degrade. Canonical fields: `name`, `description`, body (= system prompt), `tools`, `disallowedTools`, `model`, `maxTurns`, `color`, `mcpServers`, `hooks`, `memory`.
+Richest on Claude; Codex and Cursor (native `.cursor/agents/*.md`, since 1.7) support a narrower field set and degrade. Canonical agent fields in the v1 IR: `name`, `description`, body (= system prompt), `tools`, `disallowedTools`, `model`, `maxTurns`, `color`.
 
 | Canonical          | Claude `agents/*.md`          | Codex subagents              | Cursor `.cursor/agents/*.md` |
 | :----------------- | :---------------------------- | :--------------------------- | :--------------------------- |
@@ -216,14 +216,12 @@ Richest on Claude; Codex and Cursor (native `.cursor/agents/*.md`, since 1.7) su
 | `model` (tier)     | `model` (mapped)              | model (mapped)               | `model` (`fast`/`inherit`; finer tiers ⚠) |
 | `maxTurns`         | `maxTurns`                    | ⚠                            | ⚠                            |
 | `color`            | `color`                       | —                            | ⚠                            |
-| `mcpServers`       | `mcpServers`                  | ⚠ (declare in plugin config) | ⚠                            |
-| `hooks` / `memory` | `hooks` / `memory`            | ⚠                            | ⚠ (`.cursor/hooks.json` is global, not per-agent) |
 
 Cursor subagent frontmatter (1.7+) recognizes `name`, `description`, `model`, `readonly`, and `is_background` (name must match the filename stem); the body is the system prompt. The adapter maps a write-denying canonical tool config (a `Write`+`Edit` denial, or an allowlist granting no write/exec tool) to `readonly: true` — Cursor's flag is at least as restrictive, so degradation never widens access. Remaining fields degrade with a diagnostic; `is_background` is reachable via the `targets.cursor` escape hatch.
 
-> **Note on Claude plugin subagents:** when shipped inside a plugin, Claude ignores `hooks`, `mcpServers`, and `permissionMode` for security. The Claude adapter must therefore emit a `Validate()` warning if an agent relies on these and is bound for plugin distribution.
+> Agent-level `mcpServers`, `hooks`, and `memory` are **not** in the v1 IR — a plugin's MCP servers and hooks are defined once at the plugin level (`mcp/servers.yaml`, `hooks/hooks.yaml`). To attach a native per-agent field a target supports, use the per-component `targets:` escape hatch.
 
-The canonical IR carries the full superset; each adapter's `Capabilities()` declares which agent fields it honors, and `Compile()` drops the rest with diagnostics — same degradation model as components.
+The canonical IR carries this field set; each adapter's `Capabilities()` declares which it honors, and `Compile()` drops the rest with diagnostics — the same degradation model as components.
 
 ---
 
@@ -371,12 +369,12 @@ omniplug/
 ## 7. CLI Surface (Go + cobra)
 
 ```
-omniplug init [name]                 # scaffold a canonical plugin
-omniplug validate                    # schema + per-adapter Validate(); no writes
+omniplug init [name]                 # scaffold a canonical plugin (--force to overwrite)
+omniplug validate  --target all|claude|cursor    # schema + dry compile; no writes
 omniplug build  --target all|claude|cursor|codex --out dist/
 omniplug install --target … --scope user|project [--dry-run]
 omniplug list-targets                # registered adapters + capability matrix
-omniplug doctor                      # detect installed tools, versions, paths
+omniplug doctor                      # planned — detect installed tools, versions, paths (see §12, D5)
 ```
 
 - `validate` and `--dry-run` make CI and pre-commit safe.

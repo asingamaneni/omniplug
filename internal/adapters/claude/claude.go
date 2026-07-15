@@ -45,7 +45,7 @@ func (a *Adapter) Capabilities() adapter.Capabilities {
 }
 
 // modelTier maps an abstract tier to a Claude model alias.
-func modelTier(t model.ModelTier) string {
+func modelTier(t model.Tier) string {
 	switch t {
 	case model.TierFast:
 		return "haiku"

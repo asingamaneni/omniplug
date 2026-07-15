@@ -17,7 +17,7 @@ func newInitCmd() *cobra.Command {
 		Use:   "init [name]",
 		Short: "Scaffold a new canonical plugin source",
 		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			name := "my-plugin"
 			if len(args) == 1 {
 				name = args[0]
@@ -58,7 +58,9 @@ func scaffoldConflicts(root string, files map[string]string) []string {
 	var out []string
 	for rel := range files {
 		dest := filepath.Join(root, filepath.FromSlash(rel))
-		if _, err := os.Stat(dest); err == nil {
+		// Lstat (not Stat) so a dangling symlink at the destination is still
+		// treated as a conflict rather than being written through.
+		if _, err := os.Lstat(dest); err == nil {
 			out = append(out, dest)
 		}
 	}

@@ -20,8 +20,6 @@ var nameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 // for other hook kinds yet, so accepting them would emit broken output.
 var validHookTypes = map[string]bool{"command": true}
 
-var validTransports = map[string]bool{"stdio": true, "http": true, "sse": true}
-
 // Validate checks structural rules: required fields, safe names, enum membership,
 // and uniqueness of names within each component type.
 func Validate(p *model.Plugin) []adapter.Diagnostic {
@@ -158,11 +156,11 @@ func checkDup(comp, name string, seen map[string]bool) []adapter.Diagnostic {
 	return nil
 }
 
-func checkModel(comp string, m model.ModelTier) []adapter.Diagnostic {
+func checkModel(comp string, m model.Tier) []adapter.Diagnostic {
 	if m == model.TierUnset {
 		return nil
 	}
-	for _, valid := range model.ValidModelTiers {
+	for _, valid := range model.ValidTiers {
 		if m == valid {
 			return nil
 		}

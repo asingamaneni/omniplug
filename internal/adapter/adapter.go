@@ -15,6 +15,7 @@ import (
 // Scope is where a compiled plugin is installed.
 type Scope string
 
+// Install scopes.
 const (
 	ScopeProject Scope = "project"
 	ScopeUser    Scope = "user"
@@ -23,6 +24,7 @@ const (
 // Severity classifies a Diagnostic.
 type Severity string
 
+// Diagnostic severities. Errors block compilation; warnings do not.
 const (
 	SeverityWarning Severity = "warning"
 	SeverityError   Severity = "error"
@@ -59,6 +61,7 @@ func HasErrors(ds []Diagnostic) bool {
 // CommandSupport describes how a target expresses canonical commands.
 type CommandSupport string
 
+// How each target expresses canonical commands.
 const (
 	CmdNative  CommandSupport = "native"  // first-class slash commands
 	CmdRules   CommandSupport = "rules"   // mapped to manual rules

@@ -24,7 +24,7 @@ func TestMissingDescriptionIsError(t *testing.T) {
 	}
 }
 
-func TestInvalidModelTierIsError(t *testing.T) {
+func TestInvalidTierIsError(t *testing.T) {
 	p := &model.Plugin{Name: "ok", Skills: []model.Skill{{Name: "s", Description: "d", Model: "turbo"}}}
 	if !adapter.HasErrors(Validate(p)) {
 		t.Error("expected error for invalid model tier")

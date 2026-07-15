@@ -24,13 +24,13 @@ type fakeErrAdapter struct{}
 
 func (f *fakeErrAdapter) Name() string                                  { return "fake-err" }
 func (f *fakeErrAdapter) Capabilities() adapter.Capabilities            { return adapter.Capabilities{} }
-func (f *fakeErrAdapter) Validate(p *model.Plugin) []adapter.Diagnostic { return nil }
-func (f *fakeErrAdapter) Compile(p *model.Plugin) (adapter.Bundle, []adapter.Diagnostic, error) {
+func (f *fakeErrAdapter) Validate(_ *model.Plugin) []adapter.Diagnostic { return nil }
+func (f *fakeErrAdapter) Compile(_ *model.Plugin) (adapter.Bundle, []adapter.Diagnostic, error) {
 	b := adapter.NewBundle()
 	b.Add("boom.txt", []byte("x"))
 	return b, []adapter.Diagnostic{adapter.Error("fake-err", "plugin", "boom")}, nil
 }
-func (f *fakeErrAdapter) InstallPlan(p *model.Plugin, s adapter.Scope, projectDir string) (adapter.InstallPlan, error) {
+func (f *fakeErrAdapter) InstallPlan(_ *model.Plugin, _ adapter.Scope, projectDir string) (adapter.InstallPlan, error) {
 	return adapter.InstallPlan{Root: filepath.Join(projectDir, "fake-err")}, nil
 }
 
@@ -55,8 +55,8 @@ func run(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	root.SetArgs(args)
 	err = root.Execute()
 
-	wOut.Close()
-	wErr.Close()
+	_ = wOut.Close()
+	_ = wErr.Close()
 	outB, _ := io.ReadAll(rOut)
 	errB, _ := io.ReadAll(rErr)
 	return string(outB), string(errB), err
@@ -115,8 +115,10 @@ func TestBuildWritesSelectedTargets(t *testing.T) {
 			t.Errorf("built output missing %s: %v", f, err)
 		}
 	}
-	if strings.Contains(stdout, "1 files") {
-		t.Errorf("pluralization regression in output:\n%s", stdout)
+	// The example compiles to multiple files per target, so the output must use
+	// the pluralized countNoun form ("N files"), confirming it is wired in.
+	if !strings.Contains(stdout, "files)") || !strings.Contains(stdout, "built claude") {
+		t.Errorf("build output missing pluralized file count:\n%s", stdout)
 	}
 }
 
@@ -173,6 +175,29 @@ func TestCountNoun(t *testing.T) {
 	}
 	if got := countNoun(3, "file"); got != "3 files" {
 		t.Errorf("countNoun(3) = %q", got)
+	}
+}
+
+// TestBuildSingularFileCount exercises the n==1 wiring end-to-end: a
+// guidance-only plugin compiles to exactly one Cursor file, so the output must
+// read "1 file" (not "1 files").
+func TestBuildSingularFileCount(t *testing.T) {
+	src := t.TempDir()
+	if err := os.WriteFile(filepath.Join(src, "plugin.yaml"), []byte("name: solo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(src, "guidance"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "guidance", "AGENTS.md"), []byte("Be careful.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, err := run(t, "build", "-s", src, "-o", filepath.Join(t.TempDir(), "dist"), "-t", "cursor")
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if !strings.Contains(stdout, "(1 file)") {
+		t.Errorf("single-file build should read '1 file':\n%s", stdout)
 	}
 }
 

@@ -123,6 +123,44 @@ func TestHookMatcherTranslation(t *testing.T) {
 	}
 }
 
+// TestHookMatcherPartialTranslationFiresUnfiltered locks the safe-degradation
+// rule: a matcher mixing translatable and untranslatable tokens must NOT emit
+// the translated subset (which would silently skip the dropped tools); it fires
+// unfiltered so a guard hook still runs on every operation.
+func TestHookMatcherPartialTranslationFiresUnfiltered(t *testing.T) {
+	p := &model.Plugin{Name: "demo", Hooks: []model.Hook{
+		{Event: "PreToolUse", Matcher: "Bash|mcp__github", Type: "command", Command: "./hooks/guard.sh"},
+	}}
+	b, ds, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	hooks := string(b.Files[".cursor/hooks.json"])
+	if strings.Contains(hooks, `"matcher"`) {
+		t.Errorf("a partially-translatable matcher must be dropped, not narrowed:\n%s", hooks)
+	}
+	if !strings.Contains(hooks, ".cursor/hooks/guard.sh") {
+		t.Errorf("the hook must still ship (fires unfiltered):\n%s", hooks)
+	}
+	if !hasWarnContaining(ds, "mcp__github") || !hasWarnContaining(ds, "unfiltered") {
+		t.Errorf("partial translation must warn that the hook fires unfiltered: %+v", ds)
+	}
+}
+
+func TestExecBitPreservedForBundledHookScript(t *testing.T) {
+	p := &model.Plugin{Name: "demo",
+		Hooks:     []model.Hook{{Event: "PostToolUse", Type: "command", Command: "./hooks/format.sh"}},
+		HookFiles: []model.File{{RelPath: "hooks/format.sh", Content: []byte("echo hi\n"), Mode: 0o755}},
+	}
+	b, _, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if b.Modes[".cursor/hooks/format.sh"] != 0o755 {
+		t.Errorf("exec bit not preserved on bundled hook script: mode = %v", b.Modes[".cursor/hooks/format.sh"])
+	}
+}
+
 func TestNativeAgentFile(t *testing.T) {
 	b, ds := compile(t)
 	agent := string(b.Files[".cursor/agents/rev.md"])
@@ -144,7 +182,7 @@ func TestNativeAgentFile(t *testing.T) {
 	}
 }
 
-func TestAgentModelTiers(t *testing.T) {
+func TestAgentTiers(t *testing.T) {
 	p := &model.Plugin{Name: "demo", Agents: []model.Agent{
 		{Name: "fast", Description: "d", Model: model.TierFast, Body: "x"},
 		{Name: "inh", Description: "d", Model: model.TierInherit, Body: "x"},
