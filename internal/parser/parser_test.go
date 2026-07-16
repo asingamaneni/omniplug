@@ -151,6 +151,43 @@ func contains(s, sub string) bool {
 	return false
 }
 
+func TestStrayHooksJSONExcludedFromHookFiles(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "plugin.yaml"), []byte("name: demo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "hooks", "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(rel, content string) {
+		if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("hooks/hooks.yaml", "hooks: []\n")
+	write("hooks/hooks.json", `{"stale": true}`) // migration leftover
+	write("hooks/scripts/x.sh", "echo\n")
+	p, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	for _, f := range p.HookFiles {
+		if f.RelPath == "hooks/hooks.json" {
+			t.Errorf("a stray hooks/hooks.json must not be bundled as a hook file (would clobber the compiled one)")
+		}
+	}
+	// the real script is still collected
+	var haveScript bool
+	for _, f := range p.HookFiles {
+		if f.RelPath == "hooks/scripts/x.sh" {
+			haveScript = true
+		}
+	}
+	if !haveScript {
+		t.Errorf("real hook scripts must still be collected: %+v", p.HookFiles)
+	}
+}
+
 func TestManifestMetadataFields(t *testing.T) {
 	dir := t.TempDir()
 	manifest := "name: meta\nlicense: MIT\nhomepage: https://example.com\nrepository: https://github.com/x/meta\nkeywords: [ai, plugin]\n"

@@ -93,10 +93,20 @@ func (a *Adapter) Compile(p *model.Plugin) (adapter.Bundle, []adapter.Diagnostic
 	}
 
 	for _, c := range p.Commands {
-		b.Add(rel("rules", c.Name+".mdc"), onDemandRule(c.Description, c.Body))
-		if len(c.AllowedTools) > 0 || c.Model != model.TierUnset {
+		b.Add(rel("rules", c.Name+".mdc"), onDemandRule(c))
+		var dropped []string
+		if len(c.AllowedTools) > 0 {
+			dropped = append(dropped, "allowedTools")
+		}
+		if c.Model != model.TierUnset {
+			dropped = append(dropped, "model")
+		}
+		if c.ArgumentHint != "" {
+			dropped = append(dropped, "argumentHint")
+		}
+		if len(dropped) > 0 {
 			ds = append(ds, adapter.Warn(name, "command:"+c.Name,
-				"allowed-tools/model dropped (not expressible in a Cursor rule)"))
+				"Cursor rules cannot express "+strings.Join(dropped, ", ")+"; dropped"))
 		}
 	}
 
@@ -110,11 +120,14 @@ func (a *Adapter) Compile(p *model.Plugin) (adapter.Bundle, []adapter.Diagnostic
 		hb, hd := compileHooks(p.Hooks)
 		if hb != nil {
 			b.Add(rel("hooks.json"), hb)
-			for _, f := range p.HookFiles {
-				b.AddFile(rel(f.RelPath), f.Content, f.Mode)
-			}
 		}
 		ds = append(ds, hd...)
+	}
+	// Bundled scripts ship regardless of whether any hook survived translation:
+	// they may be referenced by an MCP server, or by a hook whose event Cursor
+	// does not support (the compiled hooks.json is then empty, hb == nil).
+	for _, f := range p.HookFiles {
+		b.AddFile(rel(f.RelPath), f.Content, f.Mode)
 	}
 
 	if len(p.MCPServers) > 0 {
@@ -127,6 +140,13 @@ func (a *Adapter) Compile(p *model.Plugin) (adapter.Bundle, []adapter.Diagnostic
 
 	if p.Guidance != nil && p.Guidance.Body != "" {
 		b.Add(rel("rules", p.Name+"-guidance.mdc"), alwaysRule(p.Name+" project guidance", p.Guidance.Body))
+	}
+
+	// Cursor has no manifest file, so a manifest-level targets.cursor override
+	// has nowhere to go — surface it instead of dropping it silently.
+	if len(p.Targets[name]) > 0 {
+		ds = append(ds, adapter.Warn(name, "manifest",
+			"manifest-level targets.cursor has no manifest to apply to on Cursor; dropped"))
 	}
 
 	return b, ds, nil
@@ -394,13 +414,24 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic) {
 }
 
 // onDemandRule emits a Cursor rule activated on demand (via @mention or by the
-// agent based on its description). globs is empty, alwaysApply false.
-func onDemandRule(description, body string) []byte {
+// agent based on its description). globs is empty and alwaysApply false by
+// default, but the per-command targets.cursor escape hatch may override any of
+// description/globs/alwaysApply (or add fields) — the builder has no key dedup,
+// so a default is skipped when the override provides that key.
+func onDemandRule(c model.Command) []byte {
 	b := &yamlfm.Builder{}
-	b.Scalar("description", description)
-	b.RawField("globs", "")
-	b.Bool("alwaysApply", false)
-	return b.Render(body)
+	tgt := c.Targets[name]
+	if _, ok := tgt["description"]; !ok {
+		b.Scalar("description", c.Description)
+	}
+	if _, ok := tgt["globs"]; !ok {
+		b.RawField("globs", "")
+	}
+	if _, ok := tgt["alwaysApply"]; !ok {
+		b.Bool("alwaysApply", false)
+	}
+	b.Targets(tgt)
+	return b.Render(c.Body)
 }
 
 // alwaysRule emits a rule injected into every prompt.
@@ -471,7 +502,9 @@ func cursorInterpolateArgs(args []string) []string {
 	}
 	out := make([]string, len(args))
 	for i, a := range args {
-		out[i] = cursorInterpolate(a)
+		// Same treatment as the command: rewrite bundled './' references to the
+		// installed .cursor/ path and env refs to ${env:VAR}.
+		out[i] = cursorMCPCommand(a)
 	}
 	return out
 }
@@ -487,11 +520,25 @@ func cursorInterpolateEnv(env map[string]string) map[string]string {
 	return out
 }
 
-// cursorMCPCommand rewrites a bundled-server command (`./servers/x`) to use
-// Cursor's `${workspaceFolder}` root; PATH-resolved commands pass through.
-func cursorMCPCommand(cmd string) string {
+// bundledRef reports whether cmd is a bundled plugin-root-relative reference
+// ("./hooks/x") and, if so, returns the path after the leading "./". Bundled
+// files are emitted under .cursor/, so both cursorCommand and cursorMCPCommand
+// rebase such references there — just with different roots.
+func bundledRef(cmd string) (string, bool) {
 	if strings.HasPrefix(cmd, "./") {
-		return "${workspaceFolder}/" + cmd[len("./"):]
+		return cmd[len("./"):], true
+	}
+	return "", false
+}
+
+// cursorMCPCommand rewrites a bundled-server command (`./servers/x`) to the
+// absolute install path `${workspaceFolder}/.cursor/servers/x` (where the file
+// is actually bundled); PATH-resolved commands pass through with env
+// interpolation. An MCP server's working directory is undefined, so this uses an
+// absolute path rather than the project-root-relative form hooks can rely on.
+func cursorMCPCommand(cmd string) string {
+	if rest, ok := bundledRef(cmd); ok {
+		return "${workspaceFolder}/.cursor/" + rest
 	}
 	return cursorInterpolate(cmd)
 }
@@ -500,8 +547,8 @@ func cursorMCPCommand(cmd string) string {
 // project-root-relative path under .cursor/, where the bundled script is emitted.
 // Cursor resolves project hook command paths relative to the project root.
 func cursorCommand(cmd string) string {
-	if strings.HasPrefix(cmd, "./") {
-		return ".cursor/" + cmd[len("./"):]
+	if rest, ok := bundledRef(cmd); ok {
+		return ".cursor/" + rest
 	}
 	return cmd
 }

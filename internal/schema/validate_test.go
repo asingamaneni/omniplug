@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/asingamaneni/omniplug/internal/adapter"
@@ -135,6 +136,31 @@ func TestMCPIgnoredCrossTransportFieldWarns(t *testing.T) {
 	}
 	if len(ds) == 0 {
 		t.Error("expected a warning for ignored 'url' on stdio transport")
+	}
+}
+
+func TestRemoteMCPEnvArgsWarn(t *testing.T) {
+	p := &model.Plugin{Name: "ok", MCPServers: []model.MCPServer{{
+		Name: "remote", Transport: "http", URL: "https://x",
+		Env: map[string]string{"TOKEN": "secret"}, Args: []string{"--tenant"},
+	}}}
+	ds := Validate(p)
+	if adapter.HasErrors(ds) {
+		t.Errorf("ignored env/args on a remote server should warn, not error: %+v", ds)
+	}
+	var warnedEnv, warnedArgs bool
+	for _, d := range ds {
+		if d.Severity == adapter.SeverityWarning {
+			if strings.Contains(d.Message, "'env'") {
+				warnedEnv = true
+			}
+			if strings.Contains(d.Message, "'args'") {
+				warnedArgs = true
+			}
+		}
+	}
+	if !warnedEnv || !warnedArgs {
+		t.Errorf("http server must warn about dropped env and args: %+v", ds)
 	}
 }
 

@@ -55,6 +55,14 @@ func Compile(p *model.Plugin, targets []string) ([]Result, []adapter.Diagnostic,
 
 	var results []Result
 	allDiags := append([]adapter.Diagnostic(nil), schemaDiags...)
+	// A manifest-level targets.<name> block for a target no adapter provides
+	// would otherwise be silently ignored.
+	for key := range p.Targets {
+		if _, ok := adapter.Get(key); !ok {
+			allDiags = append(allDiags, adapter.Warn("manifest", "targets",
+				fmt.Sprintf("targets.%s is not a registered target; ignored", key)))
+		}
+	}
 	for _, n := range names {
 		ad, _ := adapter.Get(n)
 		var diags []adapter.Diagnostic
@@ -66,6 +74,12 @@ func Compile(p *model.Plugin, targets []string) ([]Result, []adapter.Diagnostic,
 		diags = append(diags, compileDiags...)
 		if len(bundle.Files) == 0 {
 			diags = append(diags, adapter.Warn(n, "plugin", "compiled bundle is empty (no components to emit)"))
+		}
+		// A key written by two components silently loses one; make it fatal so
+		// the bad bundle is never written (gated by Result.HasErrors downstream).
+		for _, path := range bundle.Collisions() {
+			diags = append(diags, adapter.Error(n, "bundle",
+				fmt.Sprintf("multiple components emit %q; one would be silently dropped", path)))
 		}
 		results = append(results, Result{Target: n, Bundle: bundle, Diagnostics: diags})
 		allDiags = append(allDiags, diags...)

@@ -120,12 +120,14 @@ components:
   mcp:      { path: mcp/servers.yaml }
   guidance: { path: guidance/AGENTS.md }
 
-# Optional per-target overrides (escape hatch; rarely needed).
+# Optional manifest-level per-target overrides (escape hatch; rarely needed).
+# Raw fields are merged verbatim into the target's manifest — Claude's
+# plugin.json here. Targets without a manifest (Cursor) emit a diagnostic, and
+# an unregistered target key is warned by the compiler. Per-component overrides
+# live in each skill/command/agent's own `targets:` block.
 targets:
-  cursor:
-    commands: { mode: manual }      # how to map commands on this target
-  codex:
-    prompts:  { deprecatedOk: true }
+  claude:
+    keywords: ["ai", "devtools"]    # merged into .claude-plugin/plugin.json
 ```
 
 `mcp/servers.yaml` (neutral; compiled into each target's MCP format):
