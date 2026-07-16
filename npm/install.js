@@ -40,7 +40,7 @@ const archivePath = path.join(binDir, asset);
 function download(u, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 10) return reject(new Error("too many redirects"));
-    https.get(u, { headers: { "User-Agent": "omniplug-installer" } }, (res) => {
+    const req = https.get(u, { headers: { "User-Agent": "omniplug-installer" } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         return resolve(download(res.headers.location, dest, redirects + 1));
@@ -50,19 +50,34 @@ function download(u, dest, redirects = 0) {
         return reject(new Error(`HTTP ${res.statusCode} for ${u}`));
       }
       const file = fs.createWriteStream(dest);
-      res.pipe(file);
+      // pipe() does NOT forward source errors, so a truncated/aborted body
+      // would otherwise settle neither resolve nor reject (silent hang / a
+      // partial archive). Watch the response too and fail loudly, cleaning up.
+      const fail = (err) => {
+        file.destroy();
+        fs.rmSync(dest, { force: true });
+        reject(err);
+      };
+      res.on("error", fail);
+      res.on("aborted", () => fail(new Error("connection closed before the download completed")));
+      file.on("error", fail);
       file.on("finish", () => file.close(resolve));
-      file.on("error", reject);
-    }).on("error", reject);
+      res.pipe(file);
+    });
+    req.on("error", reject);
+    // Guard against a stalled connection that never sends data or a FIN.
+    req.setTimeout(60000, () => req.destroy(new Error("download timed out after 60s")));
   });
 }
 
 function unpack(archive, dir) {
   if (ext === "zip") {
-    // Windows: use PowerShell's Expand-Archive.
+    // Windows: PowerShell's Expand-Archive. Pass paths via env vars rather than
+    // interpolating into the -Command string, so a directory name containing
+    // $var, $(...), or backticks cannot be expanded or executed by PowerShell.
     execFileSync("powershell", ["-NoProfile", "-Command",
-      `Expand-Archive -Path "${archive}" -DestinationPath "${dir}" -Force`],
-      { stdio: "inherit" });
+      "Expand-Archive -Path $env:OMNIPLUG_ARCHIVE -DestinationPath $env:OMNIPLUG_DEST -Force"],
+      { stdio: "inherit", env: { ...process.env, OMNIPLUG_ARCHIVE: archive, OMNIPLUG_DEST: dir } });
   } else {
     execFileSync("tar", ["-xzf", archive, "-C", dir], { stdio: "inherit" });
   }
