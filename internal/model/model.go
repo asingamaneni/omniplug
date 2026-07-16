@@ -48,8 +48,11 @@ type Plugin struct {
 	MCPServers []MCPServer
 	Guidance   *Guidance
 
-	// Targets holds per-target raw overrides (escape hatch), keyed by adapter
-	// name. Adapters copy these verbatim into their output.
+	// Targets holds manifest-level per-target raw overrides (escape hatch),
+	// keyed by adapter name. A target with a manifest merges its block verbatim
+	// into that manifest (Claude's plugin.json); a target without one (Cursor)
+	// emits a diagnostic, and an unregistered target key is warned by the
+	// compiler. Per-component overrides live on each Skill/Command/Agent.
 	Targets map[string]map[string]any
 }
 

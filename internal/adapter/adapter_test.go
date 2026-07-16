@@ -98,6 +98,21 @@ func TestBundleAddFileSanitizesMode(t *testing.T) {
 	}
 }
 
+func TestBundleCollisions(t *testing.T) {
+	b := NewBundle()
+	b.Add("a.txt", []byte("1"))
+	b.Add("b.txt", []byte("1"))
+	if len(b.Collisions()) != 0 {
+		t.Errorf("no collisions expected yet, got %v", b.Collisions())
+	}
+	b.Add("a.txt", []byte("2"))            // overwrite via Add
+	b.AddFile("b.txt", []byte("2"), 0o644) // overwrite via AddFile
+	got := b.Collisions()
+	if len(got) != 2 || got[0] != "a.txt" || got[1] != "b.txt" {
+		t.Errorf("Collisions() = %v, want sorted [a.txt b.txt]", got)
+	}
+}
+
 func TestHasErrors(t *testing.T) {
 	warns := []Diagnostic{Warn("x", "c", "w")}
 	if HasErrors(warns) {

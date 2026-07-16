@@ -1,16 +1,16 @@
 {
-  "name": "hello-plugin",
-  "version": "0.1.0",
-  "description": "Example plugin exercising every omniplug component.",
   "author": {
     "name": "Ashok",
     "url": "https://github.com/asingamaneni/omniplug"
   },
-  "license": "MIT",
+  "description": "Example plugin exercising every omniplug component.",
   "homepage": "https://asingamaneni.github.io/omniplug",
-  "repository": "https://github.com/asingamaneni/omniplug",
   "keywords": [
     "example",
     "omniplug"
-  ]
+  ],
+  "license": "MIT",
+  "name": "hello-plugin",
+  "repository": "https://github.com/asingamaneni/omniplug",
+  "version": "0.1.0"
 }

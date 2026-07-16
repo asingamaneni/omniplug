@@ -114,15 +114,34 @@ func checkMCPServer(comp string, m model.MCPServer) []adapter.Diagnostic {
 			ds = append(ds, adapter.Error(source, comp,
 				fmt.Sprintf("%s MCP server requires 'url'", m.Transport)))
 		}
-		if m.Command != "" {
+		// Remote servers carry only a url downstream; command/args/env are not
+		// expressible, so surface the drop rather than losing (e.g.) an auth
+		// token silently. Authenticate remote servers via the url or headers.
+		for _, f := range ignoredRemoteFields(m) {
 			ds = append(ds, adapter.Warn(source, comp,
-				fmt.Sprintf("'command' is ignored for %s transport", m.Transport)))
+				fmt.Sprintf("'%s' is ignored for %s transport (remote servers take only 'url')", f, m.Transport)))
 		}
 	default:
 		ds = append(ds, adapter.Error(source, comp,
 			fmt.Sprintf("invalid transport %q (want stdio, http, or sse)", m.Transport)))
 	}
 	return ds
+}
+
+// ignoredRemoteFields lists the stdio-only fields set on a remote (http/sse)
+// server, in a stable order, which downstream MCP configs cannot express.
+func ignoredRemoteFields(m model.MCPServer) []string {
+	var out []string
+	if m.Command != "" {
+		out = append(out, "command")
+	}
+	if len(m.Args) > 0 {
+		out = append(out, "args")
+	}
+	if len(m.Env) > 0 {
+		out = append(out, "env")
+	}
+	return out
 }
 
 func requireNameDesc(comp, name, desc string) []adapter.Diagnostic {

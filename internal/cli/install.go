@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/asingamaneni/omniplug/internal/adapter"
@@ -45,6 +46,12 @@ func newInstallCmd() *cobra.Command {
 				plan, err := ad.InstallPlan(p, sc, projectDir)
 				if err != nil {
 					return err
+				}
+				// Cursor bakes project-root-relative script paths into
+				// hooks.json/mcp.json at compile time, which don't resolve for a
+				// user-scoped install rooted at $HOME. Warn rather than fail.
+				if sc == adapter.ScopeUser && r.Target == "cursor" && len(p.HookFiles) > 0 {
+					fmt.Fprintln(os.Stderr, "  warning [cursor] hooks: bundled script paths are project-relative and may not resolve for a user-scope install; prefer --scope project")
 				}
 				wr, err := installer.Write(r.Bundle, plan.Root, dryRun)
 				if err != nil {

@@ -89,6 +89,25 @@ func TestManifestMetadataOmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestManifestTargetsOverlay(t *testing.T) {
+	p := samplePlugin()
+	p.Targets = map[string]map[string]any{"claude": {
+		"homepage":      "https://override.example",
+		"x-claude-only": "hi",
+	}}
+	b, _, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	manifest := string(b.Files[".claude-plugin/plugin.json"])
+	if !strings.Contains(manifest, `"homepage": "https://override.example"`) {
+		t.Errorf("targets.claude should overlay homepage:\n%s", manifest)
+	}
+	if !strings.Contains(manifest, `"x-claude-only": "hi"`) {
+		t.Errorf("targets.claude should add a Claude-specific field:\n%s", manifest)
+	}
+}
+
 func TestHookCommandUsesPluginRoot(t *testing.T) {
 	b := compile(t)
 	hooks := string(b.Files["hooks/hooks.json"])

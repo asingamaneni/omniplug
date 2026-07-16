@@ -8,6 +8,7 @@ package adapter
 
 import (
 	"io/fs"
+	"sort"
 
 	"github.com/asingamaneni/omniplug/internal/model"
 )
@@ -86,21 +87,46 @@ type Capabilities struct {
 type Bundle struct {
 	Files map[string][]byte
 	Modes map[string]fs.FileMode
+	seen  map[string]int // write count per path, to detect collisions
 }
 
 // NewBundle returns an empty Bundle.
 func NewBundle() Bundle {
-	return Bundle{Files: map[string][]byte{}, Modes: map[string]fs.FileMode{}}
+	return Bundle{Files: map[string][]byte{}, Modes: map[string]fs.FileMode{}, seen: map[string]int{}}
 }
 
 // Add stores a file's content at the given relative path (default mode).
-func (b Bundle) Add(path string, content []byte) { b.Files[path] = content }
+func (b Bundle) Add(path string, content []byte) {
+	b.track(path)
+	b.Files[path] = content
+}
 
 // AddFile stores content with an explicit (sanitized) mode. Use for bundled
 // supporting files that may need the executable bit preserved.
 func (b Bundle) AddFile(path string, content []byte, mode fs.FileMode) {
+	b.track(path)
 	b.Files[path] = content
 	b.Modes[path] = ScriptMode(mode)
+}
+
+func (b Bundle) track(path string) {
+	if b.seen != nil {
+		b.seen[path]++
+	}
+}
+
+// Collisions returns, sorted, every path written more than once. Two components
+// resolving to the same output path is a silent last-write-wins loss; callers
+// surface these as errors so the bad bundle is never written.
+func (b Bundle) Collisions() []string {
+	var out []string
+	for p, n := range b.seen {
+		if n > 1 {
+			out = append(out, p)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // ScriptMode sanitizes a source file mode to a safe output mode: 0o755 when any

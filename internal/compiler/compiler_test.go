@@ -31,6 +31,23 @@ func (f *fakeAdapter) InstallPlan(_ *model.Plugin, _ adapter.Scope, projectDir s
 	return adapter.InstallPlan{Root: projectDir}, nil
 }
 
+// fakeCollideAdapter writes the same bundle key twice to exercise collision
+// detection (a plain files map can't hold duplicate keys).
+type fakeCollideAdapter struct{}
+
+func (f *fakeCollideAdapter) Name() string                                  { return "fake-collide" }
+func (f *fakeCollideAdapter) Capabilities() adapter.Capabilities            { return adapter.Capabilities{} }
+func (f *fakeCollideAdapter) Validate(_ *model.Plugin) []adapter.Diagnostic { return nil }
+func (f *fakeCollideAdapter) Compile(_ *model.Plugin) (adapter.Bundle, []adapter.Diagnostic, error) {
+	b := adapter.NewBundle()
+	b.Add("dup.txt", []byte("first"))
+	b.Add("dup.txt", []byte("second"))
+	return b, nil, nil
+}
+func (f *fakeCollideAdapter) InstallPlan(_ *model.Plugin, _ adapter.Scope, projectDir string) (adapter.InstallPlan, error) {
+	return adapter.InstallPlan{Root: projectDir}, nil
+}
+
 func TestMain(m *testing.M) {
 	adapter.Register(&fakeAdapter{name: "fake-ok", files: map[string][]byte{"a.txt": []byte("x")}})
 	adapter.Register(&fakeAdapter{
@@ -39,6 +56,7 @@ func TestMain(m *testing.M) {
 		diags: []adapter.Diagnostic{adapter.Error("fake-err", "x", "boom")},
 	})
 	adapter.Register(&fakeAdapter{name: "fake-empty"})
+	adapter.Register(&fakeCollideAdapter{})
 	os.Exit(m.Run())
 }
 
@@ -105,6 +123,34 @@ func TestEmptyBundleWarns(t *testing.T) {
 	}
 	if !warned {
 		t.Errorf("empty bundle should warn: %+v", results[0].Diagnostics)
+	}
+}
+
+func TestBundleCollisionSurfacesError(t *testing.T) {
+	results, _, err := Compile(validPlugin(), []string{"fake-collide"})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if !results[0].HasErrors() {
+		t.Errorf("a colliding bundle key must produce an error: %+v", results[0].Diagnostics)
+	}
+}
+
+func TestUnknownTargetKeyWarns(t *testing.T) {
+	p := validPlugin()
+	p.Targets = map[string]map[string]any{"no-such-target": {"k": "v"}}
+	_, diags, err := Compile(p, []string{"fake-ok"})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	var warned bool
+	for _, d := range diags {
+		if d.Severity == adapter.SeverityWarning && strings.Contains(d.Message, "no-such-target") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Errorf("an unregistered manifest targets key must warn: %+v", diags)
 	}
 }
 

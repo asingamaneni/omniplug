@@ -327,7 +327,11 @@ func loadHookFiles(pluginRoot string) ([]model.File, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if rel == hooksFile { // skip hooks/hooks.yaml
+		// Skip the canonical source (hooks.yaml) and a stray hooks.json: the
+		// latter is the adapter-generated artifact name, so a source copy left
+		// behind (e.g. migrating a native Claude plugin) must not overwrite the
+		// freshly compiled hooks.json in the bundle.
+		if rel == hooksFile || rel == "hooks/hooks.json" {
 			return nil
 		}
 		content, err := readFileCapped(path)
