@@ -57,6 +57,12 @@ func Write(b adapter.Bundle, root string, dryRun bool) (WriteResult, error) {
 		if err := os.WriteFile(dest, b.Files[rel], mode); err != nil {
 			return res, fmt.Errorf("writing %s: %w", rel, err)
 		}
+		// os.WriteFile only applies mode when it creates the file, so a rebuild
+		// or reinstall over an existing file would keep the old permissions.
+		// Force the intended mode so an author's exec-bit fix actually lands.
+		if err := os.Chmod(dest, mode); err != nil {
+			return res, fmt.Errorf("chmod %s: %w", rel, err)
+		}
 	}
 	return res, nil
 }
