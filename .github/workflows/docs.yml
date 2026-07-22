@@ -34,7 +34,7 @@ jobs:
           # Auto-enable Pages (Actions source) on first run so the workflow
           # doesn't hard-fail before the repo setting is flipped manually.
           enablement: true
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.23"
       - name: Install Hugo (extended)
