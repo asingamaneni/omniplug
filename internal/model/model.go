@@ -54,6 +54,11 @@ type Plugin struct {
 	// emits a diagnostic, and an unregistered target key is warned by the
 	// compiler. Per-component overrides live on each Skill/Command/Agent.
 	Targets map[string]map[string]any
+
+	// TargetOptions holds Omniplug-controlled, target-specific compilation
+	// options. Unlike Targets, these values are never emitted as raw target
+	// output; each adapter validates and interprets its own option namespace.
+	TargetOptions map[string]map[string]any
 }
 
 // Author identifies the plugin author.

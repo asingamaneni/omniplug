@@ -122,6 +122,40 @@ func TestBuildWritesSelectedTargets(t *testing.T) {
 	}
 }
 
+func TestBuildConvertsCommandsToClaudeSkills(t *testing.T) {
+	src := t.TempDir()
+	manifest := "name: converted\ntargetOptions:\n  claude:\n    commandEmission: skills\n"
+	if err := os.WriteFile(filepath.Join(src, "plugin.yaml"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(src, "commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	command := "---\ndescription: Review the current change\nargumentHint: \"[range]\"\n---\n\nReview $ARGUMENTS.\n"
+	if err := os.WriteFile(filepath.Join(src, "commands", "review.md"), []byte(command), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := run(t, "validate", "-s", src, "-t", "claude"); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+
+	out := filepath.Join(t.TempDir(), "dist")
+	if _, _, err := run(t, "build", "-s", src, "-o", out, "-t", "claude"); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	converted := filepath.Join(out, "claude", "skills", "review", "SKILL.md")
+	content, err := os.ReadFile(converted)
+	if err != nil {
+		t.Fatalf("converted command skill missing: %v", err)
+	}
+	if !strings.Contains(string(content), "disable-model-invocation: true") || !strings.Contains(string(content), "user-invocable: true") {
+		t.Errorf("converted command skill missing command invocation controls:\n%s", content)
+	}
+	if _, err := os.Stat(filepath.Join(out, "claude", "commands", "review.md")); !os.IsNotExist(err) {
+		t.Errorf("legacy command output must be absent, stat error = %v", err)
+	}
+}
+
 func TestBuildUnknownTargetErrors(t *testing.T) {
 	_, _, err := run(t, "build", "-s", examplePath, "-o", t.TempDir(), "-t", "no-such")
 	if err == nil || !strings.Contains(err.Error(), "unknown target") {

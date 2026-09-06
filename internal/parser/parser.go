@@ -40,16 +40,17 @@ func Load(dir string) (*model.Plugin, error) {
 	}
 
 	p := &model.Plugin{
-		APIVersion:  man.APIVersion,
-		Name:        man.Name,
-		Version:     man.Version,
-		Description: man.Description,
-		Author:      model.Author{Name: man.Author.Name, URL: man.Author.URL},
-		License:     man.License,
-		Homepage:    man.Homepage,
-		Repository:  man.Repository,
-		Keywords:    man.Keywords,
-		Targets:     man.Targets,
+		APIVersion:    man.APIVersion,
+		Name:          man.Name,
+		Version:       man.Version,
+		Description:   man.Description,
+		Author:        model.Author{Name: man.Author.Name, URL: man.Author.URL},
+		License:       man.License,
+		Homepage:      man.Homepage,
+		Repository:    man.Repository,
+		Keywords:      man.Keywords,
+		Targets:       man.Targets,
+		TargetOptions: man.TargetOptions,
 	}
 	if p.Version == "" {
 		p.Version = "0.0.0"
@@ -91,11 +92,12 @@ type rawManifest struct {
 		Name string `yaml:"name"`
 		URL  string `yaml:"url"`
 	} `yaml:"author"`
-	License    string                            `yaml:"license"`
-	Homepage   string                            `yaml:"homepage"`
-	Repository string                            `yaml:"repository"`
-	Keywords   []string                          `yaml:"keywords"`
-	Targets    map[string]map[string]interface{} `yaml:"targets"`
+	License       string                            `yaml:"license"`
+	Homepage      string                            `yaml:"homepage"`
+	Repository    string                            `yaml:"repository"`
+	Keywords      []string                          `yaml:"keywords"`
+	Targets       map[string]map[string]interface{} `yaml:"targets"`
+	TargetOptions map[string]map[string]interface{} `yaml:"targetOptions"`
 }
 
 func loadManifest(path string) (*rawManifest, error) {

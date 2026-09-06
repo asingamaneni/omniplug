@@ -1,0 +1,7 @@
+apiVersion: omniplug/v1
+name: command-skills
+version: 1.0.0
+description: Claude command skill emission fixture.
+targetOptions:
+  claude:
+    commandEmission: skills

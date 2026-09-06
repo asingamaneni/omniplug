@@ -165,6 +165,7 @@ This is where the targets diverge most, so the canonical format defines its own 
 2. **Neutral names for common fields.** Fields several tools understand get a canonical name (`autoInvoke`, `allowedTools`, `argumentHint`, …); adapters rename them (e.g. `autoInvoke: false` → Claude `disable-model-invocation: true`, Codex `policy.allow_implicit_invocation: false`).
 3. **Abstract model tiers.** A canonical `model: balanced` (tiers: `fast | balanced | powerful | inherit`) is mapped per target — Claude `haiku|sonnet|opus`, Codex/Cursor their own IDs. A raw `model:` is meaningless cross-tool, so omniplug never passes provider IDs through except via the escape hatch.
 4. **Escape hatch.** An optional `targets:` block in any component's frontmatter holds raw fields copied verbatim into one target's output (e.g. Claude `context: fork`, Cursor `alwaysApply`, Codex `interface.icon_large`). Lets power users reach native features without polluting the neutral schema.
+5. **Target behavior options stay separate.** Manifest-level `targetOptions:` controls Omniplug adapter behavior and is never passed through as target output. Adapters validate their own namespace; for example, `targetOptions.claude.commandEmission: skills` changes Claude's representation of canonical commands without polluting `plugin.json` or frontmatter.
 
 #### Skill frontmatter
 
@@ -197,10 +198,12 @@ Commands are a thin specialization of skills (Claude has formally merged them). 
 | :----------------- | :---------------------------- | :--------------------------- | :-------------------------------------- |
 | `name`             | file name / `name`            | rule file name               | skill `name`                            |
 | `description`      | `description`                 | `description`                | `description`                           |
-| (always explicit)  | `disable-model-invocation: true` | on-demand `.mdc` rule (`alwaysApply: false`, empty `globs`) | `policy.allow_implicit_invocation: false` |
+| (always explicit)  | `disable-model-invocation: true`; converted skills also set `user-invocable: true` | on-demand `.mdc` rule (`alwaysApply: false`, empty `globs`) | `policy.allow_implicit_invocation: false` |
 | `argumentHint`     | `argument-hint`               | — (use `$ARGUMENTS` in body) | argument hint in body                   |
 | `allowedTools`     | `allowed-tools`               | ⚠                            | ⚠                                       |
 | `model` (tier)     | `model` (mapped)              | ⚠                            | ⚠                                       |
+
+Claude emits canonical commands as legacy `commands/<name>.md` by default. With `targetOptions.claude.commandEmission: skills`, it emits `skills/<name>/SKILL.md` instead, retaining the canonical slash name and explicit-only semantics. A canonical command and skill with the same name then collide on the same output path, which compilation treats as an error rather than silently overwriting either file.
 
 Argument substitution (`$ARGUMENTS`, `$1`, `$name`) is a shared convention across Claude and Codex; the parser preserves these tokens in the body untouched.
 
@@ -314,7 +317,7 @@ When a component (or field) has no native home on a target, the adapter declares
 |---|---|---|---|
 | `plugin.yaml` | `.claude-plugin/plugin.json` | derived (no manifest) | `agents/openai.yaml` |
 | `skills/` | `skills/` (verbatim) | `.cursor/skills/` (verbatim) | `.agents/skills/` (verbatim) |
-| `commands/` | `commands/*.md` | `.cursor/rules/*.mdc` (Agent-Requested, `@`-mentionable) | `~/.codex/prompts/*.md` (or skill) |
+| `commands/` | `commands/*.md` by default; `skills/<name>/SKILL.md` with `targetOptions.claude.commandEmission: skills` | `.cursor/rules/*.mdc` (Agent-Requested, `@`-mentionable) | `~/.codex/prompts/*.md` (or skill) |
 | `agents/` | `agents/*.md` | `.cursor/agents/*.md` (`readonly` flag) | subagents config |
 | `hooks/` | `hooks/hooks.json` (wrapped under `"hooks"`) | `.cursor/hooks.json` (`version` + camelCase events) | hooks config |
 | `mcp/servers.yaml` | `.mcp.json` (stdio+remote `type`; env `${VAR}`) | `.cursor/mcp.json` (stdio `type`; env `${env:VAR}`) | mcp block in `openai.yaml`/config |
