@@ -24,6 +24,13 @@ import (
 
 const name = "claude"
 
+type commandEmission string
+
+const (
+	commandEmissionCommands commandEmission = "commands"
+	commandEmissionSkills   commandEmission = "skills"
+)
+
 func init() { adapter.Register(&Adapter{}) }
 
 // Adapter is the Claude Code target.
@@ -63,11 +70,53 @@ func modelTier(t model.Tier) string {
 // Validate checks Claude-specific constraints.
 func (a *Adapter) Validate(p *model.Plugin) []adapter.Diagnostic {
 	var ds []adapter.Diagnostic
+	ds = append(ds, validateTargetOptions(p)...)
 	for _, h := range p.Hooks {
 		if !knownHookEvent(h.Event) {
 			ds = append(ds, adapter.Warn(name, "hooks",
 				fmt.Sprintf("hook event %q is not a known Claude event (case-sensitive)", h.Event)))
 		}
+	}
+	return ds
+}
+
+// commandEmissionMode resolves Claude's command representation. Validation
+// reports malformed values; this resolver intentionally falls back to the
+// legacy layout so direct Adapter.Compile callers remain deterministic.
+func commandEmissionMode(p *model.Plugin) commandEmission {
+	mode, _ := p.TargetOptions[name]["commandEmission"].(string)
+	if mode == string(commandEmissionSkills) {
+		return commandEmissionSkills
+	}
+	return commandEmissionCommands
+}
+
+func validateTargetOptions(p *model.Plugin) []adapter.Diagnostic {
+	options := p.TargetOptions[name]
+	if len(options) == 0 {
+		return nil
+	}
+
+	var ds []adapter.Diagnostic
+	for key := range options {
+		if key != "commandEmission" {
+			ds = append(ds, adapter.Error(name, "targetOptions",
+				fmt.Sprintf("targetOptions.claude.%s is not a supported option", key)))
+		}
+	}
+
+	raw, ok := options["commandEmission"]
+	if !ok {
+		return ds
+	}
+	mode, ok := raw.(string)
+	if !ok {
+		return append(ds, adapter.Error(name, "targetOptions",
+			"targetOptions.claude.commandEmission must be a string (commands or skills)"))
+	}
+	if mode != string(commandEmissionCommands) && mode != string(commandEmissionSkills) {
+		return append(ds, adapter.Error(name, "targetOptions",
+			fmt.Sprintf("targetOptions.claude.commandEmission must be commands or skills, got %q", mode)))
 	}
 	return ds
 }
@@ -98,6 +147,10 @@ func (a *Adapter) Compile(p *model.Plugin) (adapter.Bundle, []adapter.Diagnostic
 		}
 	}
 	for _, c := range p.Commands {
+		if commandEmissionMode(p) == commandEmissionSkills {
+			b.Add(filepath.ToSlash(filepath.Join("skills", c.Name, "SKILL.md")), compileCommandSkill(c))
+			continue
+		}
 		b.Add(filepath.ToSlash(filepath.Join("commands", c.Name+".md")), compileCommand(c))
 	}
 	for _, ag := range p.Agents {
@@ -214,6 +267,46 @@ func compileCommand(c model.Command) []byte {
 	b.Bool("disable-model-invocation", true)
 	b.Targets(c.Targets[name])
 	return b.Render(c.Body)
+}
+
+// compileCommandSkill represents an explicit canonical command as a Claude
+// skill. Its invocation controls are deliberately fixed so conversion does not
+// make a formerly manual command model-invocable or change its slash name.
+func compileCommandSkill(c model.Command) []byte {
+	b := &yamlfm.Builder{}
+	b.Scalar("name", c.Name)
+	b.Scalar("description", c.Description)
+	b.Scalar("argument-hint", c.ArgumentHint)
+	b.List("allowed-tools", c.AllowedTools)
+	b.Raw("model", modelTier(c.Model))
+	b.Bool("disable-model-invocation", true)
+	b.Bool("user-invocable", true)
+	b.Targets(commandSkillTargets(c.Targets[name]))
+	return b.Render(c.Body)
+}
+
+// commandSkillTargets retains raw Claude-specific fields that do not conflict
+// with the canonical command metadata emitted by compileCommandSkill.
+func commandSkillTargets(raw map[string]interface{}) map[string]interface{} {
+	if len(raw) == 0 {
+		return nil
+	}
+	controlled := map[string]bool{
+		"name":                     true,
+		"description":              true,
+		"argument-hint":            true,
+		"allowed-tools":            true,
+		"model":                    true,
+		"disable-model-invocation": true,
+		"user-invocable":           true,
+	}
+	out := make(map[string]interface{}, len(raw))
+	for key, value := range raw {
+		if !controlled[key] {
+			out[key] = value
+		}
+	}
+	return out
 }
 
 func compileAgent(ag model.Agent) []byte {

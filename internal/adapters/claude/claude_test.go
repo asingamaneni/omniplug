@@ -198,3 +198,89 @@ func TestExecBitPreservedForBundledScript(t *testing.T) {
 		t.Errorf("exec bit not preserved: mode = %v", b.Modes["skills/deploy/scripts/go.sh"])
 	}
 }
+
+func TestCommandEmissionSkills(t *testing.T) {
+	p := samplePlugin()
+	p.Commands[0] = model.Command{
+		Name:         "review",
+		Description:  "Review changes",
+		ArgumentHint: "[range]",
+		AllowedTools: []string{"Read", "Grep"},
+		Model:        model.TierBalanced,
+		Body:         "Review $ARGUMENTS.",
+		Targets: map[string]map[string]any{"claude": {
+			"x-claude-only":            "kept",
+			"name":                     "must-not-override",
+			"disable-model-invocation": false,
+			"user-invocable":           false,
+		}},
+	}
+	p.TargetOptions = map[string]map[string]any{"claude": {"commandEmission": "skills"}}
+
+	b, ds, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if len(ds) != 0 {
+		t.Fatalf("Compile diagnostics = %+v, want none", ds)
+	}
+	if _, ok := b.Files["commands/review.md"]; ok {
+		t.Error("skills emission must not produce the legacy command file")
+	}
+	content, ok := b.Files["skills/review/SKILL.md"]
+	if !ok {
+		t.Fatal("skills emission must produce skills/review/SKILL.md")
+	}
+	got := string(content)
+	for _, want := range []string{
+		`name: "review"`,
+		`description: "Review changes"`,
+		`argument-hint: "[range]"`,
+		`allowed-tools: ["Read", "Grep"]`,
+		"model: sonnet",
+		"disable-model-invocation: true",
+		"user-invocable: true",
+		`"x-claude-only": "kept"`,
+		"Review $ARGUMENTS.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("converted command skill missing %q:\n%s", want, got)
+		}
+	}
+	for _, absent := range []string{"must-not-override", "disable-model-invocation: false", "user-invocable: false"} {
+		if strings.Contains(got, absent) {
+			t.Errorf("converted command skill must protect command controls from overrides %q:\n%s", absent, got)
+		}
+	}
+}
+
+func TestCommandEmissionCommandsIsExplicitLegacyMode(t *testing.T) {
+	p := samplePlugin()
+	p.TargetOptions = map[string]map[string]any{"claude": {"commandEmission": "commands"}}
+	b, _, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if _, ok := b.Files["commands/review.md"]; !ok {
+		t.Error("explicit commands mode must retain legacy command output")
+	}
+	if _, ok := b.Files["skills/review/SKILL.md"]; ok {
+		t.Error("explicit commands mode must not produce a converted command skill")
+	}
+}
+
+func TestInvalidTargetOptionsProduceErrors(t *testing.T) {
+	for name, options := range map[string]map[string]any{
+		"unknown option": {"other": true},
+		"wrong type":     {"commandEmission": true},
+		"invalid mode":   {"commandEmission": "both"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := samplePlugin()
+			p.TargetOptions = map[string]map[string]any{"claude": options}
+			if ds := (&Adapter{}).Validate(p); !adapter.HasErrors(ds) {
+				t.Errorf("Validate diagnostics = %+v, want error", ds)
+			}
+		})
+	}
+}

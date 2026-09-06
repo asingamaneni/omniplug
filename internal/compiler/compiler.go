@@ -63,6 +63,14 @@ func Compile(p *model.Plugin, targets []string) ([]Result, []adapter.Diagnostic,
 				fmt.Sprintf("targets.%s is not a registered target; ignored", key)))
 		}
 	}
+	// Target options control adapter behavior rather than emitted output, but an
+	// unknown namespace would otherwise be silently ignored just like Targets.
+	for key := range p.TargetOptions {
+		if _, ok := adapter.Get(key); !ok {
+			allDiags = append(allDiags, adapter.Warn("manifest", "targetOptions",
+				fmt.Sprintf("targetOptions.%s is not a registered target; ignored", key)))
+		}
+	}
 	for _, n := range names {
 		ad, _ := adapter.Get(n)
 		var diags []adapter.Diagnostic

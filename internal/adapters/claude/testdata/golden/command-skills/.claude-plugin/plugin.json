@@ -1,0 +1,5 @@
+{
+  "description": "Claude command skill emission fixture.",
+  "name": "command-skills",
+  "version": "1.0.0"
+}

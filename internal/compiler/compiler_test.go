@@ -7,6 +7,8 @@ import (
 
 	"github.com/asingamaneni/omniplug/internal/adapter"
 	"github.com/asingamaneni/omniplug/internal/model"
+
+	_ "github.com/asingamaneni/omniplug/internal/adapters/claude"
 )
 
 // fakeAdapter is a minimal adapter for exercising the compiler. The registry is
@@ -151,6 +153,48 @@ func TestUnknownTargetKeyWarns(t *testing.T) {
 	}
 	if !warned {
 		t.Errorf("an unregistered manifest targets key must warn: %+v", diags)
+	}
+}
+
+func TestUnknownTargetOptionsKeyWarns(t *testing.T) {
+	p := validPlugin()
+	p.TargetOptions = map[string]map[string]any{"no-such-target": {"option": "value"}}
+	_, diags, err := Compile(p, []string{"fake-ok"})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	var warned bool
+	for _, d := range diags {
+		if d.Severity == adapter.SeverityWarning && strings.Contains(d.Message, "targetOptions.no-such-target") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Errorf("an unregistered manifest targetOptions key must warn: %+v", diags)
+	}
+}
+
+func TestConvertedCommandAndSkillCollisionSurfacesError(t *testing.T) {
+	p := validPlugin()
+	p.Skills = []model.Skill{{Name: "deploy", Description: "Deploy"}}
+	p.Commands = []model.Command{{Name: "deploy", Description: "Deploy command"}}
+	p.TargetOptions = map[string]map[string]any{"claude": {"commandEmission": "skills"}}
+
+	results, _, err := Compile(p, []string{"claude"})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if len(results) != 1 || !results[0].HasErrors() {
+		t.Fatalf("same-named skill and converted command must collide: %+v", results)
+	}
+	var collision bool
+	for _, d := range results[0].Diagnostics {
+		if strings.Contains(d.Message, `skills/deploy/SKILL.md`) {
+			collision = true
+		}
+	}
+	if !collision {
+		t.Errorf("collision diagnostics must name converted skill path: %+v", results[0].Diagnostics)
 	}
 }
 

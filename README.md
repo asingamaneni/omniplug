@@ -45,6 +45,16 @@ omniplug --version
 
 Full command reference, flags, and the canonical frontmatter schema: **[Usage guide →](https://asingamaneni.github.io/omniplug/docs/usage/)**
 
+Claude command output remains backward-compatible by default (`commands/<name>.md`). To compile existing canonical commands as Claude `SKILL.md` files instead, add:
+
+```yaml
+targetOptions:
+  claude:
+    commandEmission: skills
+```
+
+The source layout stays `commands/<name>.md`; only the Claude output changes. Converted commands remain slash-invocable and model-invocation-disabled. See the [Usage guide](https://asingamaneni.github.io/omniplug/docs/usage/#claude-command-emission) for compatibility and collision details.
+
 Try it against the bundled example:
 
 ```bash

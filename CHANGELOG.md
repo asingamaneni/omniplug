@@ -6,6 +6,10 @@ All notable changes to omniplug are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in Claude command-as-skill emission via `targetOptions.claude.commandEmission: skills`. Existing canonical `commands/*.md` sources can now compile to `skills/<name>/SKILL.md` while retaining explicit, user-invocable command semantics. Legacy Claude command output remains the default; invalid options and command/skill path collisions are diagnosed before output is written.
+
 ## [0.1.0] — 2026-07-15
 
 First public release.

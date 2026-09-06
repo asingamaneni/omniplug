@@ -47,6 +47,22 @@ repository: https://github.com/you/my-plugin
 keywords: [ai, workflow]
 ```
 
+### Claude command emission
+
+Canonical commands always remain source files under `commands/<name>.md`. Claude's default output preserves the legacy representation at `commands/<name>.md`, but you can compile every canonical command as a Claude skill instead:
+
+```yaml
+targetOptions:
+  claude:
+    commandEmission: skills
+```
+
+This emits `skills/<name>/SKILL.md` with the command's canonical name, body, arguments, tools, and model mapping. Converted commands stay explicitly invocable: Omniplug emits both `disable-model-invocation: true` and `user-invocable: true`.
+
+Set `commandEmission: commands` explicitly to retain the default. No source-file migration is required, so this setting is safe to add to an existing plugin that already has `commands/*.md`.
+
+`targetOptions` controls Omniplug's adapter behavior and is validated by the selected target; it is never copied into generated target files. It is distinct from `targets`, which is a raw target-native output escape hatch. A canonical command and canonical skill with the same name cannot be converted together because both would emit `skills/<name>/SKILL.md`; validation reports this as an output collision.
+
 ## Frontmatter
 
 Component frontmatter uses neutral field names and **abstract model tiers** — `fast`, `balanced`, `powerful`, or `inherit` — and each adapter maps them to native fields, degrading unsupported ones with a diagnostic. For example, a skill:

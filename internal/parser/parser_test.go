@@ -188,6 +188,27 @@ func TestStrayHooksJSONExcludedFromHookFiles(t *testing.T) {
 	}
 }
 
+func TestTargetOptionsParsedSeparatelyFromTargets(t *testing.T) {
+	dir := t.TempDir()
+	manifest := "name: demo\ntargets:\n  claude:\n    homepage: https://example.com\ntargetOptions:\n  claude:\n    commandEmission: skills\n"
+	if err := os.WriteFile(filepath.Join(dir, "plugin.yaml"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := p.TargetOptions["claude"]["commandEmission"]; got != "skills" {
+		t.Errorf("targetOptions.claude.commandEmission = %#v, want skills", got)
+	}
+	if got := p.Targets["claude"]["homepage"]; got != "https://example.com" {
+		t.Errorf("targets.claude.homepage = %#v, want manifest override", got)
+	}
+	if _, ok := p.Targets["claude"]["commandEmission"]; ok {
+		t.Error("targetOptions must not be parsed as raw targets")
+	}
+}
+
 func TestManifestMetadataFields(t *testing.T) {
 	dir := t.TempDir()
 	manifest := "name: meta\nlicense: MIT\nhomepage: https://example.com\nrepository: https://github.com/x/meta\nkeywords: [ai, plugin]\n"

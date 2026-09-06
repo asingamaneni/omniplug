@@ -23,3 +23,15 @@ func TestGoldenHelloPlugin(t *testing.T) {
 	}
 	goldentest.Compare(t, b, "testdata/golden/hello-plugin", *update)
 }
+
+func TestGoldenCommandSkills(t *testing.T) {
+	p, err := parser.Load("testdata/source/command-skills")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	b, _, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	goldentest.Compare(t, b, "testdata/golden/command-skills", *update)
+}
