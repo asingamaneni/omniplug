@@ -1,21 +1,22 @@
 # omniplug
 
-Author an AI agent plugin **once** in a tool-neutral canonical format, then compile or install it into target-specific layouts. Claude Code and Cursor are supported today; Codex and future tools (Grok, Gemini CLI, …) slot in by implementing one adapter — no changes to the core.
+Author an AI agent plugin **once** in a tool-neutral canonical format, then compile or install it into target-specific layouts. Claude Code, Cursor and Codex are supported today; future tools (Grok, Gemini CLI, …) slot in by implementing one adapter — no changes to the core.
 
 Docs: **[asingamaneni.github.io/omniplug](https://asingamaneni.github.io/omniplug/)** — [Installation](https://asingamaneni.github.io/omniplug/docs/installation/) · [Usage](https://asingamaneni.github.io/omniplug/docs/usage/) · [Architecture](https://asingamaneni.github.io/omniplug/docs/architecture/)
 
 ## Status
 
-End-to-end pipeline (parse → IR → validate → compile → install) with two target adapters:
+End-to-end pipeline (parse → IR → validate → compile → install) with three target adapters:
 
 | Target | Skills | MCP | Commands | Agents | Hooks | Guidance |
 | ------ | :----: | :-: | :------: | :----: | :---: | :------: |
 | **claude** | yes | yes | native | yes | yes | yes |
 | **cursor** | yes | yes | rules | yes | yes | yes |
+| **codex** | yes | yes | none (as skills) | no | yes | no |
 
-Both targets support every component natively. Where a canonical field has no native home, the adapter degrades it with a diagnostic instead of producing incorrect output — e.g. hook matchers are translated from Claude tool names to Cursor tool types (`Bash`→`Shell`, `Edit`→`Write`), a write-denying agent tool config becomes Cursor's `readonly: true`, and untranslatable matchers ship unfiltered with a warning rather than silently never firing. **Codex** is next. Adding it requires only a new adapter package — no changes to the parser, compiler, or CLI.
+Both targets support every component natively. Where a canonical field has no native home, the adapter degrades it with a diagnostic instead of producing incorrect output — e.g. hook matchers are translated from Claude tool names to Cursor tool types (`Bash`→`Shell`, `Edit`→`Write`), a write-denying agent tool config becomes Cursor's `readonly: true`, and untranslatable matchers ship unfiltered with a warning rather than silently never firing. **Codex** compiles to a Codex plugin (`.codex-plugin/plugin.json`, `skills/`, `hooks/hooks.json`, `.mcp.json`), the unit `codex plugin add` installs from a marketplace. A Codex plugin has no slash commands, subagents or guidance file, so commands become skills and agents and guidance are dropped, each with a warning; hook scripts are rewritten to `${PLUGIN_ROOT}`, a stdio MCP server that runs a bundled file keeps its relative path and gets `cwd: "."` (Codex resolves it against the plugin directory and does not expand `${PLUGIN_ROOT}` in `.mcp.json`), an env value `${NAME}` for its own name is forwarded through `env_vars` (Codex passes env values as literal text, so any other `${...}` in one is reported), a skill that names `$CLAUDE_PLUGIN_ROOT` is reported, and events Codex does not dispatch are dropped with a warning. Codex runs a plugin's hooks only after the user trusts them, which `build` reports.
 
-Output formats were validated against the official Claude Code and Cursor documentation (July 2026): plugin `hooks.json` wrapping and `${CLAUDE_PLUGIN_ROOT}` rewriting, `.mcp.json` shapes, Cursor `hooks.json` v1 events/matchers, `.cursor/agents/` frontmatter (`model`/`readonly`), and `${env:VAR}` interpolation.
+Codex output passes the plugin validator that ships inside Codex CLI 0.155.1. Output formats were validated against the official Claude Code and Cursor documentation (July 2026): plugin `hooks.json` wrapping and `${CLAUDE_PLUGIN_ROOT}` rewriting, `.mcp.json` shapes, Cursor `hooks.json` v1 events/matchers, `.cursor/agents/` frontmatter (`model`/`readonly`), and `${env:VAR}` interpolation.
 
 ## Install
 
