@@ -153,6 +153,7 @@ hooks:
     matcher: "Edit|Write"
     type: command
     command: ./hooks/scripts/format.sh
+    timeout: 30                     # seconds; optional, left out = the target's default
 ```
 
 ### Component metadata (frontmatter) schemas

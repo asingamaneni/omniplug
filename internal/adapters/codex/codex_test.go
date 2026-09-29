@@ -319,3 +319,24 @@ func TestMCPEnvReferencesUseEnvVarsOrAreReported(t *testing.T) {
 		t.Error("a reference Codex cannot forward was not reported")
 	}
 }
+
+func TestHookTimeoutEmittedOnlyWhenSet(t *testing.T) {
+	p := samplePlugin()
+	p.Hooks = []model.Hook{
+		{Event: "PreToolUse", Matcher: "Bash", Type: "command", Command: "./hooks/guard.sh", Timeout: 30},
+		{Event: "SessionStart", Type: "command", Command: "./hooks/guard.sh"},
+	}
+	b, _ := compile(t, p)
+	var h struct {
+		Hooks map[string][]struct{ Hooks []map[string]any }
+	}
+	if err := json.Unmarshal(b.Files["hooks/hooks.json"], &h); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.Hooks["PreToolUse"][0].Hooks[0]["timeout"]; got != float64(30) {
+		t.Errorf("PreToolUse timeout = %v, want 30", got)
+	}
+	if _, ok := h.Hooks["SessionStart"][0].Hooks[0]["timeout"]; ok {
+		t.Error("an unset timeout must not be emitted")
+	}
+}

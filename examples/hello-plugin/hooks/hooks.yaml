@@ -3,6 +3,7 @@ hooks:
     matcher: "Edit|Write"
     type: command
     command: ./hooks/scripts/format.sh
+    timeout: 30
   - event: Stop
     type: command
     command: ./hooks/scripts/format.sh

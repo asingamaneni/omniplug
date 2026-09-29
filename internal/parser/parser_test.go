@@ -252,3 +252,44 @@ func TestSplitToolsUnit(t *testing.T) {
 		}
 	}
 }
+
+func TestHookTimeoutParsed(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "plugin.yaml"), []byte("name: demo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "hooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := "hooks:\n  - event: PreToolUse\n    command: ./hooks/g.sh\n    timeout: 30\n  - event: Stop\n    command: ./hooks/g.sh\n"
+	if err := os.WriteFile(filepath.Join(dir, "hooks", "hooks.yaml"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(p.Hooks) != 2 || p.Hooks[0].Timeout != 30 || p.Hooks[1].Timeout != 0 {
+		t.Errorf("hook timeouts = %+v, want 30 then unset", p.Hooks)
+	}
+}
+
+// A timeout is whole seconds in every target. A fractional one must be refused
+// rather than read as a different number.
+func TestHookTimeoutFractionRefused(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "plugin.yaml"), []byte("name: demo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "hooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := "hooks:\n  - event: PreToolUse\n    command: ./hooks/g.sh\n    timeout: 1.5\n"
+	if err := os.WriteFile(filepath.Join(dir, "hooks", "hooks.yaml"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Load(dir)
+	if err == nil {
+		t.Errorf("timeout 1.5 accepted as %d", p.Hooks[0].Timeout)
+	}
+}

@@ -92,6 +92,10 @@ func checkHook(h model.Hook) []adapter.Diagnostic {
 		ds = append(ds, adapter.Error(source, "hooks",
 			fmt.Sprintf("command hook for event %q is missing required 'command'", h.Event)))
 	}
+	if h.Timeout < 0 {
+		ds = append(ds, adapter.Error(source, "hooks",
+			fmt.Sprintf("hook timeout for event %q must be a positive number of seconds, got %d", h.Event, h.Timeout)))
+	}
 	return ds
 }
 

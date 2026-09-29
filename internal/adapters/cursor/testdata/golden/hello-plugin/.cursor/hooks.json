@@ -3,7 +3,8 @@
     "postToolUse": [
       {
         "command": ".cursor/hooks/scripts/format.sh",
-        "matcher": "Write"
+        "matcher": "Write",
+        "timeout": 30
       }
     ],
     "stop": [

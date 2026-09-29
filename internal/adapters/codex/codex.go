@@ -288,6 +288,7 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic, error) {
 	type hookEntry struct {
 		Type    string `json:"type"`
 		Command string `json:"command,omitempty"`
+		Timeout int    `json:"timeout,omitempty"`
 	}
 	type matcherGroup struct {
 		Matcher string      `json:"matcher,omitempty"`
@@ -303,7 +304,7 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic, error) {
 		}
 		byEvent[h.Event] = append(byEvent[h.Event], matcherGroup{
 			Matcher: h.Matcher,
-			Hooks:   []hookEntry{{Type: h.Type, Command: pluginPath(h.Command)}},
+			Hooks:   []hookEntry{{Type: h.Type, Command: pluginPath(h.Command), Timeout: h.Timeout}},
 		})
 	}
 	if len(byEvent) == 0 {

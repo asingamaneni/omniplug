@@ -176,3 +176,10 @@ func TestEffortEnumMatchesClaude(t *testing.T) {
 		t.Error("expected error for effort \"extreme\"")
 	}
 }
+
+func TestRejectsNegativeHookTimeout(t *testing.T) {
+	p := &model.Plugin{Name: "ok", Hooks: []model.Hook{{Event: "PreToolUse", Command: "./x.sh", Timeout: -1}}}
+	if !adapter.HasErrors(Validate(p)) {
+		t.Error("a negative hook timeout must be an error")
+	}
+}

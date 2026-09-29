@@ -328,6 +328,7 @@ func compileHooks(hooks []model.Hook) ([]byte, error) {
 	type hookEntry struct {
 		Type    string `json:"type"`
 		Command string `json:"command,omitempty"`
+		Timeout int    `json:"timeout,omitempty"`
 	}
 	type matcherGroup struct {
 		Matcher string      `json:"matcher,omitempty"`
@@ -337,7 +338,7 @@ func compileHooks(hooks []model.Hook) ([]byte, error) {
 	for _, h := range hooks {
 		byEvent[h.Event] = append(byEvent[h.Event], matcherGroup{
 			Matcher: h.Matcher,
-			Hooks:   []hookEntry{{Type: h.Type, Command: pluginCommand(h.Command)}},
+			Hooks:   []hookEntry{{Type: h.Type, Command: pluginCommand(h.Command), Timeout: h.Timeout}},
 		})
 	}
 	// Plugin hooks.json wraps the event map under a top-level "hooks" key.

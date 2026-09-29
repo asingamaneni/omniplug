@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${PLUGIN_ROOT}/hooks/scripts/format.sh"
+            "command": "${PLUGIN_ROOT}/hooks/scripts/format.sh",
+            "timeout": 30
           }
         ]
       }
