@@ -275,10 +275,11 @@ func loadAgents(dir string) ([]model.Agent, error) {
 
 type rawHooks struct {
 	Hooks []struct {
-		Event   string `yaml:"event"`
-		Matcher string `yaml:"matcher"`
-		Type    string `yaml:"type"`
-		Command string `yaml:"command"`
+		Event   string  `yaml:"event"`
+		Matcher string  `yaml:"matcher"`
+		Type    string  `yaml:"type"`
+		Command string  `yaml:"command"`
+		Timeout float64 `yaml:"timeout"` // read as a number so a fraction is seen, not truncated
 	} `yaml:"hooks"`
 }
 
@@ -300,7 +301,10 @@ func loadHooks(path string) ([]model.Hook, error) {
 		if typ == "" {
 			typ = "command"
 		}
-		hooks = append(hooks, model.Hook{Event: h.Event, Matcher: h.Matcher, Type: typ, Command: h.Command})
+		if h.Timeout != float64(int(h.Timeout)) {
+			return nil, fmt.Errorf("parsing %s: hook timeout for event %q must be whole seconds, got %v", hooksFile, h.Event, h.Timeout)
+		}
+		hooks = append(hooks, model.Hook{Event: h.Event, Matcher: h.Matcher, Type: typ, Command: h.Command, Timeout: int(h.Timeout)})
 	}
 	return hooks, nil
 }

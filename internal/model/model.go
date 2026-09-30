@@ -120,6 +120,7 @@ type Hook struct {
 	Matcher string // tool-name matcher pattern
 	Type    string // "command" (the only supported type in omniplug/v1)
 	Command string // command to run
+	Timeout int    // seconds before the host stops the hook; 0 = the target's default
 }
 
 // MCPServer is a neutral MCP server definition.

@@ -1,6 +1,7 @@
 package cursor
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -342,5 +343,28 @@ func TestDeterministicCompile(t *testing.T) {
 		if string(c.Files[k]) != string(v) {
 			t.Errorf("non-deterministic output for %q", k)
 		}
+	}
+}
+
+func TestHookTimeoutEmittedOnlyWhenSet(t *testing.T) {
+	p := &model.Plugin{Name: "demo", Version: "1.0.0", Hooks: []model.Hook{
+		{Event: "PostToolUse", Matcher: "Edit", Type: "command", Command: "./hooks/f.sh", Timeout: 45},
+		{Event: "Stop", Type: "command", Command: "./hooks/f.sh"},
+	}}
+	b, _, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var h struct {
+		Hooks map[string][]map[string]any
+	}
+	if err := json.Unmarshal(b.Files[".cursor/hooks.json"], &h); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.Hooks["postToolUse"][0]["timeout"]; got != float64(45) {
+		t.Errorf("postToolUse timeout = %v, want 45", got)
+	}
+	if _, ok := h.Hooks["stop"][0]["timeout"]; ok {
+		t.Error("an unset timeout must not be emitted")
 	}
 }

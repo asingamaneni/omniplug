@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -282,5 +283,29 @@ func TestInvalidTargetOptionsProduceErrors(t *testing.T) {
 				t.Errorf("Validate diagnostics = %+v, want error", ds)
 			}
 		})
+	}
+}
+
+func TestHookTimeoutEmittedOnlyWhenSet(t *testing.T) {
+	p := samplePlugin()
+	p.Hooks = []model.Hook{
+		{Event: "PreToolUse", Matcher: "Bash", Type: "command", Command: "./hooks/format.sh", Timeout: 30},
+		{Event: "Stop", Type: "command", Command: "./hooks/format.sh"},
+	}
+	b, _, err := (&Adapter{}).Compile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var h struct {
+		Hooks map[string][]struct{ Hooks []map[string]any }
+	}
+	if err := json.Unmarshal(b.Files["hooks/hooks.json"], &h); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.Hooks["PreToolUse"][0].Hooks[0]["timeout"]; got != float64(30) {
+		t.Errorf("PreToolUse timeout = %v, want 30", got)
+	}
+	if _, ok := h.Hooks["Stop"][0].Hooks[0]["timeout"]; ok {
+		t.Error("an unset timeout must not be emitted")
 	}
 }

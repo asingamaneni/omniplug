@@ -366,6 +366,7 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic) {
 	type entry struct {
 		Command string `json:"command"`
 		Matcher string `json:"matcher,omitempty"`
+		Timeout int    `json:"timeout,omitempty"`
 	}
 	byEvent := map[string][]entry{}
 	for _, h := range hooks {
@@ -399,7 +400,7 @@ func compileHooks(hooks []model.Hook) ([]byte, []adapter.Diagnostic) {
 					h.Matcher, strings.Join(droppedToks, ", "), ev)))
 			}
 		}
-		byEvent[ev] = append(byEvent[ev], entry{Command: cursorCommand(h.Command), Matcher: matcher})
+		byEvent[ev] = append(byEvent[ev], entry{Command: cursorCommand(h.Command), Matcher: matcher, Timeout: h.Timeout})
 	}
 	if len(byEvent) == 0 {
 		return nil, ds
