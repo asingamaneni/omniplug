@@ -5,7 +5,7 @@ type: docs
 
 # omniplug
 
-Author an AI agent plugin **once** in a tool-neutral canonical format, then compile or install it into target-specific layouts. **Claude Code** and **Cursor** are supported today; Codex and future tools (Grok, Gemini CLI, …) slot in by implementing one adapter — no changes to the core.
+Author an AI agent plugin **once** in a tool-neutral canonical format, then compile or install it into target-specific layouts. **Claude Code**, **Cursor** and **Codex** are supported today; future tools (Grok, Gemini CLI, …) slot in by implementing one adapter — no changes to the core.
 
 ```bash
 omniplug init my-plugin                 # scaffold a canonical plugin source

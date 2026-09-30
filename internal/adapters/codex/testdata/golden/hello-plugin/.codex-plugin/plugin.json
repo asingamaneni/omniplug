@@ -1,0 +1,31 @@
+{
+  "author": {
+    "name": "Ashok",
+    "url": "https://github.com/asingamaneni/omniplug"
+  },
+  "description": "Example plugin exercising every omniplug component.",
+  "homepage": "https://asingamaneni.github.io/omniplug",
+  "interface": {
+    "capabilities": [
+      "Interactive"
+    ],
+    "category": "Productivity",
+    "defaultPrompt": [
+      "Example plugin exercising every omniplug component."
+    ],
+    "developerName": "Ashok",
+    "displayName": "hello-plugin",
+    "longDescription": "Example plugin exercising every omniplug component.",
+    "shortDescription": "Example plugin exercising every omniplug component."
+  },
+  "keywords": [
+    "example",
+    "omniplug"
+  ],
+  "license": "MIT",
+  "mcpServers": "./.mcp.json",
+  "name": "hello-plugin",
+  "repository": "https://github.com/asingamaneni/omniplug",
+  "skills": "./skills/",
+  "version": "0.1.0"
+}

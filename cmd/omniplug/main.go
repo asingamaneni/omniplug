@@ -9,6 +9,7 @@ import (
 	// matter of implementing the adapter.Adapter interface and adding its
 	// blank import here — no changes to the compiler or CLI.
 	_ "github.com/asingamaneni/omniplug/internal/adapters/claude"
+	_ "github.com/asingamaneni/omniplug/internal/adapters/codex"
 	_ "github.com/asingamaneni/omniplug/internal/adapters/cursor"
 )
 
